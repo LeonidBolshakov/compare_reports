@@ -17,10 +17,11 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QPushButton,
     QTableView,
+    QCheckBox,
 )
 
 from compare import parse_file, compare
-from constant import Constant as c
+from constants import Constant as c
 import functions as f
 
 
@@ -31,6 +32,7 @@ class MyWindow(QtWidgets.QMainWindow):
     btnBox: QDialogButtonBox
     btnFile1: QPushButton
     btnFile2: QPushButton
+    checkBoxFast: QCheckBox
     lblFilePath1: QLabel
     lblFilePath2: QLabel
     tblResult: QTableView
@@ -38,6 +40,9 @@ class MyWindow(QtWidgets.QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         uic.loadUi(c.FILE_UI, self)  # Загрузка интерфейса из .ui файла
+
+        # Устанавливает признак быстрого диалога
+        self.sign_fast_dialogue = f.get_sign_fast_dialogue()
 
         # Инициализация стилей и состояния
         self.styleSheet_btn_default = self.btnFile1.styleSheet()
@@ -54,37 +59,46 @@ class MyWindow(QtWidgets.QMainWindow):
         self.setup_var()
         self.customize_interface()
 
+        # Быстрый диалог. Без нажатия кнопок инициации выбора файлов.
+        self.fast_dialogue()
+
     def setup_model(self):
         self.proxy.setSourceModel(self.model)
-        # Сортируем по данным, заданным в UserRole
+        # Сортируем по данным, имеющим UserRole
         self.proxy.setSortRole(Qt.ItemDataRole.UserRole)
         self.tblResult.setModel(self.proxy)
 
     def setup_var(self) -> None:
-        """Сбрасывает пути к файлам."""
+        """Сбрасывает пути к файлам"""
         self.lblFilePath1.setText("")
         self.lblFilePath2.setText("")
+        self.checkBoxFast.setChecked(True if self.sign_fast_dialogue else False)
 
     def customize_interface(self) -> None:
         """Настраивает текст кнопок и внешний вид таблицы."""
-        # Переименование кнопок
+
+        # Переименование кнопок и назначение им свойства AutoDefault
         buttons = {
             QDialogButtonBox.StandardButton.Ok: c.TEXT_BUTTON_COMPARE,
             QDialogButtonBox.StandardButton.Save: c.TEXT_BUTTON_SAVE,
             QDialogButtonBox.StandardButton.Cancel: c.TEXT_BUTTON_QUIT,
         }
         for btn_type, text in buttons.items():
-            self.btnBox.button(btn_type).setText(text)
-
-        # Делает кнопки стандартного бокса кнопок - AutoDefault. Это означает, что
-        # после установки фокуса на кнопку, отрабатывает нажатие клавиши Enter.
-        for button in self.btnBox.buttons():
-            button.setAutoDefault(True)
+            button = self.btnBox.button(btn_type)
+            if button:
+                button.setText(text)
+                button.setAutoDefault(True)
 
         # Устанавливает ширину таблицы равной ширине окна
+        self.set_table_width_to_window_width()
+
+    def set_table_width_to_window_width(self) -> None:
+        """Устанавливает ширину таблицы равной ширине окна"""
+
         header = self.tblResult.horizontalHeader()
-        header = f.set_bold(header)
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        if header is not None:
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            header = f.set_bold(header)
 
     def customize_model(self) -> None:
         """Устанавливает шапки в таблице модели"""
@@ -101,7 +115,7 @@ class MyWindow(QtWidgets.QMainWindow):
         file_name, _ = QFileDialog.getOpenFileName(
             self,
             title,
-            "",
+            f.get_downloads_path(),
             c.TYPES_FILES_OPEN,
             options=QFileDialog.Option.DontUseNativeDialog,
         )
@@ -121,7 +135,9 @@ class MyWindow(QtWidgets.QMainWindow):
         """
         self.btnFile2.setStyleSheet(self.styleSheet_btn_default)
         self.open_file_dialog(c.TITLE_OPEN_SECOND_REPORT, self.lblFilePath2)
-        self.btnBox.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        button = self.btnBox.button(QDialogButtonBox.StandardButton.Ok)
+        if button:
+            button.setFocus()
 
     def setup_connections(self) -> None:
         """
@@ -130,6 +146,7 @@ class MyWindow(QtWidgets.QMainWindow):
         self.btnFile1.clicked.connect(self.open_file_dialog1)
         self.btnFile2.clicked.connect(self.open_file_dialog2)
         self.btnBox.clicked.connect(self.handle_button_click)
+        self.checkBoxFast.stateChanged.connect(self.on_checkbox_state_change)
 
     def handle_button_click(self, button: QPushButton) -> None:
         """
@@ -139,10 +156,14 @@ class MyWindow(QtWidgets.QMainWindow):
         match self.btnBox.standardButton(button):
             case QDialogButtonBox.StandardButton.Ok:
                 self.on_click_OK()
-                self.btnBox.button(QDialogButtonBox.StandardButton.Save).setFocus()
+                btn = self.btnBox.button(QDialogButtonBox.StandardButton.Save)
+                if btn:
+                    btn.setFocus()
             case QDialogButtonBox.StandardButton.Save:
                 self.on_save()
-                self.btnBox.button(QDialogButtonBox.StandardButton.Cancel).setFocus()
+                btn = self.btnBox.button(QDialogButtonBox.StandardButton.Cancel)
+                if btn:
+                    btn.setFocus()
             case QDialogButtonBox.StandardButton.Cancel:
                 f.on_cancel()
 
@@ -160,6 +181,13 @@ class MyWindow(QtWidgets.QMainWindow):
         if files_selected:
             self.sync_model_with_report_diffs()
 
+    def on_checkbox_state_change(self, state):
+        try:
+            with open(c.FILE_TUNES, "w") as tunes:
+                tunes.write(str(state))
+        except Exception as e:
+            QMessageBox.warning(self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE} {e}")
+
     def populate_model(
         self,
         records1: dict,
@@ -170,8 +198,8 @@ class MyWindow(QtWidgets.QMainWindow):
     ) -> None:
         """
         Заселяет модель результатами сравнения отчётов.
-        Records 1 и 2 - Словари. Ключ - имя компонента,
-                        Значение - характеристики компонента. Лишние записи из отчёта отфильтрованы.
+        Records 1 и 2 - Словари, содержащие информацию о компонентах.
+                        Ключ - имя компонента. Значение - характеристики компонента.
         :param records1: Словарь первого отчёта.
         :param records2: Словарь второго отчёта.
         Остальные параметры - множества, в которых находятся ключи словарей с рассогласованиями между отчётами
@@ -217,14 +245,14 @@ class MyWindow(QtWidgets.QMainWindow):
         предупреждение, если сравнение отчётов не выполнено.
         """
         if not self.was_comparison:
-            QMessageBox.warning(self, c.TITLE_RESAVE, c.TEXET_RESAVE)
+            QMessageBox.warning(self, c.TITLE_RESAVE, c.TEXT_RESAVE)
         else:
             self.was_comparison = False
             try:
                 # Запись данных модели в csv филе
                 with open("save.csv", "w", newline="") as csv_file:
                     writer = csv.writer(csv_file, delimiter=";")
-                    f.write_head_to_csv(writer, c.LIST_HEADER_COLUMNS)
+                    writer.writerow(c.LIST_HEADER_COLUMNS)
                     self.write_model_to_csv(writer)
             except Exception as e:
                 QMessageBox.critical(
@@ -274,6 +302,16 @@ class MyWindow(QtWidgets.QMainWindow):
             item.setData(str(v_item), Qt.ItemDataRole.DisplayRole)
             row_items.append(item)
         self.model.appendRow(row_items)
+
+    def fast_dialogue(self):
+        """
+        Анализирует запрошен ли сокращённый диалог
+        и если запрошен то имитирует нажатие кнопок выбора файлов
+        :return:
+        """
+        if self.sign_fast_dialogue:
+            self.open_file_dialog1()
+            self.open_file_dialog2()
 
 
 if __name__ == "__main__":

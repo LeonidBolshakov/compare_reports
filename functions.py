@@ -1,19 +1,30 @@
+"""
+Модуль содержит автономные функции
+"""
+
+from pathlib import Path
+
 from PyQt6.QtWidgets import QPushButton, QApplication
 
-from constant import Constant as c
+from constants import Constant as c
 
 
-def set_bold(header):
-    font = header.font()
+def set_bold(widget):
+    """
+    Устанавливает жирное начертание в тексте виджета
+    :param widget:
+    :return:
+    """
+    font = widget.font()
     font.setBold(True)
-    header.setFont(font)
-    return header
+    widget.setFont(font)
+    return widget
 
 
 def highlight_button_if_no_file(button: QPushButton) -> bool:
     """
-    Метод вызывают в случае, если не был выбран файл отчёта.
-    Устанавливает стиль кнопки выбора файла и возвращает False.
+    Метод вызывают при ошибочных действиях пользователя.
+    Устанавливает стиль кнопки, по нажатию которой надо исправить ошибку и возвращает False.
     """
     button.setStyleSheet(c.STYLE_ERROR_BUTTON)
     return False
@@ -24,11 +35,29 @@ def on_cancel() -> None:
     QApplication.quit()
 
 
-def write_head_to_csv(writer, head: list[str]) -> None:
+def get_downloads_path() -> str:
     """
-    Записывает шапку таблицы в CSV файл
-    :param writer: объект, записывающий в CSV файл
-    :param head: список с текстами заголовков столбцов
-    :return: None
+    Формирует путь на каталог Downloads
+    :return: Строковое представление пути
     """
-    writer.writerow(head)
+    return str(Path.home() / c.DOWNLOADS)
+
+
+def get_sign_fast_dialogue() -> int:
+    """
+    Возвращает значение признака сокращённого интерфейса.
+    Признак читается из файла.
+    Если файла нет или возникли проблемы с чтением файла, то считается что интерфейс полный.
+    :return: True Если установлен признак сокращённого интерфейса. False в противном случае.
+    """
+    # noinspection PyBroadException
+    try:
+        with open(c.FILE_TUNES, "r") as tunes:
+            check_state = int(tunes.read(1))
+            return (
+                check_state
+                if check_state in (c.CHECKSTATE_CHECKED, c.CHECKSTATE_UNCHECKED)
+                else c.CHECKSTATE_UNCHECKED
+            )
+    except:
+        return c.CHECKSTATE_UNCHECKED

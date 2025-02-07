@@ -6,7 +6,7 @@
 import re
 from dataclasses import dataclass
 
-from constant import Constant as c
+from constants import Constant as c
 
 
 @dataclass(frozen=True, slots=False)
@@ -36,8 +36,8 @@ RE_PATTERN_LOADS = re.compile(
     r"""
     (\s*)                                           # Пробелы (игнорируются)
     (?P<name>\S+)\s+                                # Название компонента
-    (?P<version>\d{2}\\\d{2}\\\d{4} \d\d:\d\d)\s+   # Дата Время(ДД\ММ\ГГГГ ЧЧ:ММ) - аналог версии
-    (?P<size>[\d\s]+)\s+                            # Размер (числа и пробелы) 
+    (?P<version>\d{2}\\\d{2}\\\d{4}\s\d\d:\d\d)\s+   # Дата Время(ДД\ММ\ГГГГ ЧЧ:ММ) - аналог версии
+    (?P<size>[\d\s]+)\s+                               # Размер (числа и пробелы) 
     (?P<path>.+)$                                   # Путь (остаток строки)
 """,
     re.VERBOSE,  # Режим для читаемого регулярного выражения
@@ -52,7 +52,7 @@ def parse_file(file_path: str) -> dict[str, VS]:
         file_path (str): Путь к файлу.
 
     Returns:
-        dict[str, VS]: Ключ — название компонента/модуля, значение — объект VS или
+        dict[str, VS]: Ключ — название компонента/модуля, значение — объект VS
 
     Raises:
         Exception: Если возникает ошибка при чтении файла.
@@ -74,7 +74,7 @@ def parse_file(file_path: str) -> dict[str, VS]:
     return records
 
 
-def compare(records1: dict[str, VS], records2: dict[str, VS]):
+def compare(records1: dict[str, VS], records2: dict[str, VS]) -> tuple[set, set, set]:
     """
     Сравнивает два набора записей и возвращает различия.
 
