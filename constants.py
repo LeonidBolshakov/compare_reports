@@ -49,6 +49,7 @@ class Constant:
     TITLE_NO_COMP = "Предупреждение"
     TEXT_NO_COMP = " Выберите что надо сравнивать компоненты и/или загрузки"
     TEXT_NO_TUNES = "Ошибка в программе. Запрошена несуществующая настройка"
+    TITLe_ERROR_WRITE = "Ошибка"
     TEXT_ERROR_WRITE = "Ошибка записи файла настроек"
     TEXT_ERROR_TYPE_TUNES = "Попытка записать настройку с типом не str"
     TITLE_ERROR_READ = "Ошибка"

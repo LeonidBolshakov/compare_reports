@@ -84,8 +84,8 @@ class Tunes(QtWidgets.QWidget):
             match self.description_tunes[key].type:
                 case "CheckBox":
                     if tunes[key] not in (
-                        c.CHECK_STATE_CHECKED,
-                        c.CHECK_STATE_UNCHECKED,
+                            c.CHECK_STATE_CHECKED,
+                            c.CHECK_STATE_UNCHECKED,
                     ):
                         return False
                 case "String":
@@ -111,7 +111,7 @@ class Tunes(QtWidgets.QWidget):
                 else:
                     QMessageBox.warning(None, c.TITLE_ERROR_READ, c.TEXT_ERROR_READ)
         except FileNotFoundError:
-            pass # Отсутствие файла настроек не ошибка.
+            pass  # Отсутствие файла настроек не ошибка.
         except Exception as e:
             QMessageBox.warning(None, c.TITLE_ERROR_READ, c.TEXT_ERROR_READ)
         return self.get_default_tunes()
@@ -126,4 +126,4 @@ class Tunes(QtWidgets.QWidget):
                 # noinspection PyTypeChecker
                 json.dump(self.dict_tunes, file)
         except Exception as e:
-            QMessageBox.warning(f"{c.TEXT_ERROR_WRITE}\n{e}")
+            QMessageBox.warning(None, c.TITLe_ERROR_WRITE, f"{c.TEXT_ERROR_WRITE}\n{e}")

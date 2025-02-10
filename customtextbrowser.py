@@ -3,6 +3,8 @@
 Класс заменяет в базовом классе методы нажатия клавиши клавиатуры и двойного клика мыши
 """
 
+import typing
+
 from PyQt6.QtWidgets import QTextBrowser
 from PyQt6.QtCore import Qt
 
@@ -10,7 +12,7 @@ from PyQt6.QtCore import Qt
 class CustomTextBrowser(QTextBrowser):
     def __init__(self, parent):
         super().__init__(parent)
-        self.event_handler: callable = None
+        self.event_handler: typing.Callable | None = None
 
     def keyPressEvent(self, event):
         """
@@ -23,7 +25,7 @@ class CustomTextBrowser(QTextBrowser):
 
         # Проверяем, была ли нажата клавиша Enter или Return
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            if self.event_handler:
+            if callable(self.event_handler):
                 self.event_handler()
                 event.accept()  # Предотвращаем дальнейшую обработку события
         else:
@@ -36,7 +38,7 @@ class CustomTextBrowser(QTextBrowser):
         :param kwargs:
         :return:
         """
-        if self.event_handler:
+        if callable(self.event_handler):
             self.event_handler()
 
     def connect(self, event_handler):
