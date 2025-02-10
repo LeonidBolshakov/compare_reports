@@ -84,8 +84,8 @@ class Tunes(QtWidgets.QWidget):
             match self.description_tunes[key].type:
                 case "CheckBox":
                     if tunes[key] not in (
-                            c.CHECK_STATE_CHECKED,
-                            c.CHECK_STATE_UNCHECKED,
+                        c.CHECK_STATE_CHECKED,
+                        c.CHECK_STATE_UNCHECKED,
                     ):
                         return False
                 case "String":
