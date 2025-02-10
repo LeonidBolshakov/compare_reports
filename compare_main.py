@@ -7,6 +7,7 @@ import sys
 import csv
 
 from PyQt6 import QtWidgets, uic
+from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, QSortFilterProxyModel
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtWidgets import (
@@ -18,11 +19,21 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableView,
     QCheckBox,
+    QToolButton,
 )
 
 from compare import parse_file, compare
 from constants import Constant as c
 import functions as f
+from tunes import VT, Tunes
+from customtextbrowser import CustomTextBrowser
+
+DESCRIPTION_TUNES = {
+    c.CHECK_BOX_FAST: VT(c.CHECK_STATE_UNCHECKED, c.CHECK_BOX),
+    c.CHECK_BOX_COMPS: VT(c.CHECK_STATE_CHECKED, c.CHECK_BOX),
+    c.CHECK_BOX_LOADS: VT(c.CHECK_STATE_UNCHECKED, c.CHECK_BOX),
+    c.WORKING_FOLDER: VT("", c.STRING),
+}  # Имя настройки: (значение по умолчанию, метод контроля)
 
 
 class MyWindow(QtWidgets.QMainWindow):
@@ -33,20 +44,24 @@ class MyWindow(QtWidgets.QMainWindow):
     btnFile1: QPushButton
     btnFile2: QPushButton
     checkBoxFast: QCheckBox
+    checkBoxComps: QCheckBox
+    checkBoxLoads: QCheckBox
     lblFilePath1: QLabel
     lblFilePath2: QLabel
     tblResult: QTableView
+    tBtnWorkingFolder: QToolButton
+    txtWorkingFolder: CustomTextBrowser
 
     def __init__(self) -> None:
         super().__init__()
         uic.loadUi(c.FILE_UI, self)  # Загрузка интерфейса из .ui файла
 
-        # Устанавливает признак быстрого диалога
-        self.sign_fast_dialogue = f.get_sign_fast_dialogue()
+        # Устанавливает настройки программы
+        self.tunes = Tunes(DESCRIPTION_TUNES)
 
         # Инициализация стилей и состояния
         self.styleSheet_btn_default = self.btnFile1.styleSheet()
-        self.was_comparison = False  # Флаг выполнения сравнения
+        self.was_comparison = False  # Флаг выполнения сравнения отчётов
 
         # Настройка модели таблицы
         self.model = QStandardItemModel()
@@ -55,12 +70,11 @@ class MyWindow(QtWidgets.QMainWindow):
         self.setup_model()
 
         # Настройка соединений и интерфейса
-        self.setup_connections()
-        self.setup_var()
         self.customize_interface()
+        self.setup_connections()
 
         # Быстрый диалог. Без нажатия кнопок инициации выбора файлов.
-        self.fast_dialogue()
+        self.check_fast_dialogue()
 
     def setup_model(self):
         self.proxy.setSourceModel(self.model)
@@ -68,14 +82,24 @@ class MyWindow(QtWidgets.QMainWindow):
         self.proxy.setSortRole(Qt.ItemDataRole.UserRole)
         self.tblResult.setModel(self.proxy)
 
-    def setup_var(self) -> None:
-        """Сбрасывает пути к файлам"""
+    def init_widgets(self) -> None:
+        """Устанавливает значения видимых частей виджетов"""
         self.lblFilePath1.setText("")
         self.lblFilePath2.setText("")
-        self.checkBoxFast.setChecked(True if self.sign_fast_dialogue else False)
+        self.txtWorkingFolder.setText(self.tunes.get_tune(c.WORKING_FOLDER))
+        self.init_checkbox(self.checkBoxFast, c.CHECK_BOX_FAST)
+        self.init_checkbox(self.checkBoxComps, c.CHECK_BOX_COMPS)
+        self.init_checkbox(self.checkBoxLoads, c.CHECK_BOX_LOADS)
+
+    def init_checkbox(self, checkbox, name_value):
+        checkbox.setCheckState(
+            QtCore.Qt.CheckState.Checked
+            if self.tunes.get_tune(name_value) == c.CHECK_STATE_CHECKED
+            else QtCore.Qt.CheckState.Unchecked
+        )
 
     def customize_interface(self) -> None:
-        """Настраивает текст кнопок и внешний вид таблицы."""
+        """Настраивает текст кнопок, внешний вид таблицы, значения виджетов"""
 
         # Переименование кнопок и назначение им свойства AutoDefault
         buttons = {
@@ -92,13 +116,17 @@ class MyWindow(QtWidgets.QMainWindow):
         # Устанавливает ширину таблицы равной ширине окна
         self.set_table_width_to_window_width()
 
+        # Инициализируем значения виджетов
+        self.init_widgets()
+
     def set_table_width_to_window_width(self) -> None:
-        """Устанавливает ширину таблицы равной ширине окна"""
+        """Устанавливает ширину таблицы равной ширине окна и делаем заголовки 'жирными'"""
 
         header = self.tblResult.horizontalHeader()
+
         if header is not None:
             header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            header = f.set_bold(header)
+            f.set_bold(header)
 
     def customize_model(self) -> None:
         """Устанавливает шапки в таблице модели"""
@@ -115,11 +143,12 @@ class MyWindow(QtWidgets.QMainWindow):
         file_name, _ = QFileDialog.getOpenFileName(
             self,
             title,
-            f.get_downloads_path(),
+            self.tunes.get_tune(c.WORKING_FOLDER),
             c.TYPES_FILES_OPEN,
             options=QFileDialog.Option.DontUseNativeDialog,
         )
-        label.setText(file_name)
+        if file_name:
+            label.setText(file_name)
 
     def open_file_dialog1(self) -> None:
         """
@@ -127,14 +156,17 @@ class MyWindow(QtWidgets.QMainWindow):
         """
         self.btnFile1.setStyleSheet(self.styleSheet_btn_default)
         self.open_file_dialog(c.TITLE_OPEN_FIRST_REPORT, self.lblFilePath1)
-        self.btnFile2.setFocus()
+        self.btnFile2.setFocus()  # Приглашает открыть файл со вторым отчётом
 
     def open_file_dialog2(self) -> None:
         """
         Открывает диалог выбора файла второго отчёта
         """
-        self.btnFile2.setStyleSheet(self.styleSheet_btn_default)
+        self.btnFile2.setStyleSheet(
+            self.styleSheet_btn_default
+        )  # Восстанавливает стиль кнопки для случая, если раньше была ошибка
         self.open_file_dialog(c.TITLE_OPEN_SECOND_REPORT, self.lblFilePath2)
+        # Приглашает приступить к сравнению отчётов
         button = self.btnBox.button(QDialogButtonBox.StandardButton.Ok)
         if button:
             button.setFocus()
@@ -147,6 +179,10 @@ class MyWindow(QtWidgets.QMainWindow):
         self.btnFile2.clicked.connect(self.open_file_dialog2)
         self.btnBox.clicked.connect(self.handle_button_click)
         self.checkBoxFast.stateChanged.connect(self.on_checkbox_state_change)
+        self.checkBoxLoads.stateChanged.connect(self.on_checkbox_state_change)
+        self.checkBoxComps.stateChanged.connect(self.on_checkbox_state_change)
+        self.tBtnWorkingFolder.clicked.connect(self.set_working_folder)
+        self.txtWorkingFolder.connect(self.set_working_folder)
 
     def handle_button_click(self, button: QPushButton) -> None:
         """
@@ -167,12 +203,13 @@ class MyWindow(QtWidgets.QMainWindow):
             case QDialogButtonBox.StandardButton.Cancel:
                 f.on_cancel()
 
+    # noinspection PyPep8Naming
     def on_click_OK(self) -> None:
         """Обработчик кнопки 'Сравнить'. Запускает разбор и сравнение файлов."""
         self.model.clear()
-        files_selected = True
 
         # Проверка. Выбраны ли файлы отчётов.
+        files_selected = True
         if not self.lblFilePath1.text():
             files_selected = f.highlight_button_if_no_file(self.btnFile1)
         if not self.lblFilePath2.text():
@@ -181,12 +218,30 @@ class MyWindow(QtWidgets.QMainWindow):
         if files_selected:
             self.sync_model_with_report_diffs()
 
-    def on_checkbox_state_change(self, state):
-        try:
-            with open(c.FILE_TUNES, "w") as tunes:
-                tunes.write(str(state))
-        except Exception as e:
-            QMessageBox.warning(self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE} {e}")
+    def on_checkbox_state_change(self):
+        """Обрабатывает изменение статуса любого чекбокса.
+        Считывает статусы всех чек боксов и отдаёт их объекту работу с настройками"""
+        self.checkbox_state_change(self.checkBoxFast, c.CHECK_BOX_FAST)
+        self.checkbox_state_change(self.checkBoxComps, c.CHECK_BOX_COMPS)
+        self.checkbox_state_change(self.checkBoxLoads, c.CHECK_BOX_LOADS, write=True)
+
+    def checkbox_state_change(self, checkbox, name: str, write: bool = False) -> None:
+        """
+        Инициирует изменение настройки о статусе чекбокса.
+        :param checkbox: Чекбокс, статус которого проверяется.
+        :param name: Имя настройки
+        :param write: Признак, надо ли сохранять изменения настроек в файл.
+        :return: None
+        """
+        self.tunes.put_tune(
+            name,
+            (
+                c.CHECK_STATE_CHECKED
+                if checkbox.checkState() == QtCore.Qt.CheckState.Checked
+                else c.CHECK_STATE_UNCHECKED
+            ),
+            write,
+        )
 
     def populate_model(
         self,
@@ -232,7 +287,7 @@ class MyWindow(QtWidgets.QMainWindow):
 
     def check_empty_data(self) -> None:
         """
-        Проверяет заселена ли модель и если не заселена, выдаёт сообщение в модель.
+        Проверяет заселена ли модель и если не заселена, выдаёт информационное сообщение в модель.
         :return: None
         """
         if not self.model.rowCount():
@@ -241,7 +296,7 @@ class MyWindow(QtWidgets.QMainWindow):
         self.customize_model()  # Обновление заголовков
 
     def on_save(self) -> None:
-        """Обработчик кнопки 'Сохранить'. Записывает модель в CSV файл и показывает
+        """Обработчик кнопки 'Сохранить'. Записывает модель в CSV файл и выдаёт
         предупреждение, если сравнение отчётов не выполнено.
         """
         if not self.was_comparison:
@@ -256,22 +311,36 @@ class MyWindow(QtWidgets.QMainWindow):
                     self.write_model_to_csv(writer)
             except Exception as e:
                 QMessageBox.critical(
-                    self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE} {e}"
+                    self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE}\n{e}"
                 )
 
     def sync_model_with_report_diffs(self) -> None:
         """Получает нужные записи из отчётов, инициирует их
         сравнение и заселение модели отличиями в отчётах
         """
+        if (
+            self.tunes.get_tune(c.CHECK_BOX_COMPS) == c.CHECK_STATE_UNCHECKED
+            and self.tunes.get_tune(c.CHECK_BOX_LOADS) == c.CHECK_STATE_UNCHECKED
+        ):  # Не выбран ни один из вариантов сравнения
+            QMessageBox.warning(self, c.TITLE_NO_COMP, c.TEXT_NO_COMP)
+            return
         try:
-            records1 = parse_file(self.lblFilePath1.text())
-            records2 = parse_file(self.lblFilePath2.text())
+            records1 = parse_file(
+                self.lblFilePath1.text(),
+                self.tunes.get_tune(c.CHECK_BOX_COMPS) == c.CHECK_STATE_CHECKED,
+                self.tunes.get_tune(c.CHECK_BOX_LOADS) == c.CHECK_STATE_CHECKED,
+            )
+            records2 = parse_file(
+                self.lblFilePath2.text(),
+                self.tunes.get_tune(c.CHECK_BOX_COMPS) == c.CHECK_STATE_CHECKED,
+                self.tunes.get_tune(c.CHECK_BOX_LOADS) == c.CHECK_STATE_CHECKED,
+            )
             only_in_1, only_in_2, differences = compare(records1, records2)
 
             self.populate_model(records1, records2, only_in_1, only_in_2, differences)
             self.was_comparison = True
         except Exception as e:
-            QMessageBox.critical(self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE} {e}")
+            QMessageBox.critical(self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE}\n{e}")
 
     def write_model_to_csv(self, writer) -> None:
         """
@@ -297,21 +366,40 @@ class MyWindow(QtWidgets.QMainWindow):
         for v_item in items:
             item = QStandardItem()
             item.setData(v_item, Qt.ItemDataRole.UserRole)
-            if type(v_item) is int:
-                v_item = f"{v_item:,}".replace(",", "'")
-            item.setData(str(v_item), Qt.ItemDataRole.DisplayRole)
+            v_item_str = (
+                f"{v_item:,}".replace(",", "'")
+                if isinstance(v_item, int)
+                else str(v_item)
+            )
+            item.setData(v_item_str, Qt.ItemDataRole.DisplayRole)
             row_items.append(item)
         self.model.appendRow(row_items)
 
-    def fast_dialogue(self):
+    def check_fast_dialogue(self) -> None:
         """
         Анализирует запрошен ли сокращённый диалог
         и если запрошен то имитирует нажатие кнопок выбора файлов
-        :return:
+        :return: None
         """
-        if self.sign_fast_dialogue:
+        if self.tunes.get_tune(c.CHECK_BOX_FAST) == c.CHECK_STATE_CHECKED:
             self.open_file_dialog1()
             self.open_file_dialog2()
+
+    def set_working_folder(self) -> None:
+        """
+        Запрашивает у Пользователя рабочую папку.
+        При отказе от выбора папки путь на рабочую папку остаётся прежним.
+        :return: None
+        """
+        worker_folder = QFileDialog.getExistingDirectory(
+            self,
+            c.TITLE_SET_WORKING_FOLDER,
+            self.tunes.get_tune(c.WORKING_FOLDER),
+        )
+
+        if worker_folder:
+            self.txtWorkingFolder.setText(worker_folder)
+            self.tunes.put_tune(c.WORKING_FOLDER, worker_folder, write=True)
 
 
 if __name__ == "__main__":

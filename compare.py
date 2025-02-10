@@ -6,6 +6,8 @@
 import re
 from dataclasses import dataclass
 
+from PyQt6.QtWidgets import QMessageBox
+
 from constants import Constant as c
 
 
@@ -23,7 +25,7 @@ RE_PATTERN_COMPONENTS = re.compile(
     (\W*)                      # Незначащие символы (игнорируются)
     (?P<type>\S+)\s+           # Тип компонента
     (?P<name>\S+)\s+           # Название компонента
-    (?P<version>[\d\.]+)\s+    # Версия (числа и точки)
+    (?P<version>[\d.]+)\s+     # Версия (числа и точки)
     (?P<size>[\d\s]+)\s+       # Размер (числа и пробелы)
     (?P<path>.+)$              # Путь (остаток строки)
 """,
@@ -36,23 +38,27 @@ RE_PATTERN_LOADS = re.compile(
     r"""
     (\s*)                                           # Пробелы (игнорируются)
     (?P<name>\S+)\s+                                # Название компонента
-    (?P<version>\d{2}\\\d{2}\\\d{4}\s\d\d:\d\d)\s+   # Дата Время(ДД\ММ\ГГГГ ЧЧ:ММ) - аналог версии
-    (?P<size>[\d\s]+)\s+                               # Размер (числа и пробелы) 
+    (?P<version>\d{2}\\\d{2}\\\d{4}\s\d\d:\d\d)\s+  # Дата Время(ДД\ММ\ГГГГ ЧЧ:ММ) - аналог версии
+    (?P<size>[\d\s]+)\s+                            # Размер (числа и пробелы) 
     (?P<path>.+)$                                   # Путь (остаток строки)
 """,
     re.VERBOSE,  # Режим для читаемого регулярного выражения
 )
 
 
-def parse_file(file_path: str) -> dict[str, VS]:
+def parse_file(
+    file_path: str, compare_comps: bool, compare_loads: bool
+) -> dict[str, VS]:
     """
-    Разбирает текстовый файл отчета и возвращает словарь компонентов и загруженных модулей.
+    Разбирает текстовый файл отчета и возвращает словарь компонентов и/или загруженных модулей.
 
     Args:
         file_path (str): Путь к файлу.
+        compare_comps (bool): Признак того, что надо сравнивать компоненты
+        compare_loads (bool): Признак того, что надо сравнивать загрузки
 
     Returns:
-        dict[str, VS]: Ключ — название компонента/модуля, значение — объект VS
+        dict[str, VS]: Ключ — название компонента/модуля, значение — объект VS.
 
     Raises:
         Exception: Если возникает ошибка при чтении файла.
@@ -61,8 +67,10 @@ def parse_file(file_path: str) -> dict[str, VS]:
     try:
         with open(file_path, "r", encoding=c.ENCODING_FILE) as file:
             for line in file:
-                match_components = RE_PATTERN_COMPONENTS.match(line)
-                match_loads = RE_PATTERN_LOADS.match(line)
+                match_components = (
+                    RE_PATTERN_COMPONENTS.match(line) if compare_comps else None
+                )
+                match_loads = RE_PATTERN_LOADS.match(line) if compare_loads else None
                 match = match_components if match_components else None
                 match = match_loads if match_loads else match
                 if match:
@@ -70,7 +78,7 @@ def parse_file(file_path: str) -> dict[str, VS]:
                     value = VS(match["version"], int(match["size"].replace(" ", "")))
                     records[key] = value
     except Exception as e:
-        raise e
+        QMessageBox.critical(None, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE}\n{e}")
     return records
 
 

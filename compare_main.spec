@@ -6,7 +6,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-	('compare_reports.ui', '.'), 
+	('_internal\compare_reports.ui', '.'), 
 	('compare.py', '.'),
 	('constants.py', '.'),
 	('functions.py', '.'),
