@@ -28,7 +28,7 @@ def highlight_button_if_no_file(button: QPushButton) -> bool:
     return False
 
 
-def on_cancel() -> None:
+def on_click_cancel() -> None:
     """Завершает работу приложения."""
     QApplication.quit()
 
@@ -39,3 +39,13 @@ def get_downloads_path() -> str:
     :return: Строковое представление пути на каталог Downloads
     """
     return str(Path.home() / c.DOWNLOADS)
+
+
+def set_focus(btn: QPushButton | None) -> None:
+    """
+    Устанавливает фокус на требуемую кнопку
+    :param btn: Кнопка
+    :return: None
+    """
+    if btn:
+        btn.setFocus()

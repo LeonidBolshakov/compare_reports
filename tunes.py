@@ -55,6 +55,7 @@ class Tunes(QtWidgets.QWidget):
                 f"{c.TEXT_ERROR_TYPE_TUNES}. Имя {type(name)} Значение {type(str)}"
             )
         self.dict_tunes[name] = value
+
         if write:
             self.write_tunes()
 
@@ -84,8 +85,8 @@ class Tunes(QtWidgets.QWidget):
             match self.description_tunes[key].type:
                 case "CheckBox":
                     if tunes[key] not in (
-                        c.CHECK_STATE_CHECKED,
-                        c.CHECK_STATE_UNCHECKED,
+                            c.CHECK_STATE_CHECKED,
+                            c.CHECK_STATE_UNCHECKED,
                     ):
                         return False
                 case "String":

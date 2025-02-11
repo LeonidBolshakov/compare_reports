@@ -8,7 +8,7 @@ import csv
 
 from PyQt6 import QtWidgets, uic
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QSortFilterProxyModel
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, QTimer
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -20,8 +20,10 @@ from PyQt6.QtWidgets import (
     QTableView,
     QCheckBox,
     QToolButton,
+    QApplication,
 )
 
+import functions
 from compare import parse_file, compare
 from constants import Constant as c
 import functions as f
@@ -30,6 +32,7 @@ from customtextbrowser import CustomTextBrowser
 
 DESCRIPTION_TUNES = {
     c.CHECK_BOX_FAST: VT(c.CHECK_STATE_UNCHECKED, c.CHECK_BOX),
+    c.CHECK_BOX_SUPER_FAST: VT(c.CHECK_STATE_UNCHECKED, c.CHECK_BOX),
     c.CHECK_BOX_COMPS: VT(c.CHECK_STATE_CHECKED, c.CHECK_BOX),
     c.CHECK_BOX_LOADS: VT(c.CHECK_STATE_UNCHECKED, c.CHECK_BOX),
     c.WORKING_FOLDER: VT("", c.STRING),
@@ -44,6 +47,7 @@ class MyWindow(QtWidgets.QMainWindow):
     btnFile1: QPushButton
     btnFile2: QPushButton
     checkBoxFast: QCheckBox
+    checkBoxSuperFast: QCheckBox
     checkBoxComps: QCheckBox
     checkBoxLoads: QCheckBox
     lblFilePath1: QLabel
@@ -76,6 +80,9 @@ class MyWindow(QtWidgets.QMainWindow):
         # Быстрый диалог. Без нажатия кнопок инициации выбора файлов.
         self.check_fast_dialogue()
 
+        # Сверхбыстрый диалог. Выбор двух отчётов в одном диалоге.
+        self.check_super_fast_dialogue()
+
     def setup_model(self):
         self.proxy.setSourceModel(self.model)
         # Сортируем по данным, имеющим UserRole
@@ -88,6 +95,7 @@ class MyWindow(QtWidgets.QMainWindow):
         self.lblFilePath2.setText("")
         self.txtWorkingFolder.setText(self.tunes.get_tune(c.WORKING_FOLDER))
         self.init_checkbox(self.checkBoxFast, c.CHECK_BOX_FAST)
+        self.init_checkbox(self.checkBoxSuperFast, c.CHECK_BOX_SUPER_FAST)
         self.init_checkbox(self.checkBoxComps, c.CHECK_BOX_COMPS)
         self.init_checkbox(self.checkBoxLoads, c.CHECK_BOX_LOADS)
 
@@ -150,13 +158,28 @@ class MyWindow(QtWidgets.QMainWindow):
         if file_name:
             label.setText(file_name)
 
+    def open_files_dialog(self) -> list[str]:
+        while True:
+            filenames, _ = QFileDialog.getOpenFileNames(
+                self,
+                c.TITLE_OPEN_TWO_FILES,
+                self.tunes.get_tune(c.WORKING_FOLDER),
+                c.TYPES_FILES_OPEN,
+                options=QFileDialog.Option.DontUseNativeDialog,
+            )
+            if len(filenames) == 0 or len(filenames) == 2:
+                return filenames
+            QMessageBox.warning(
+                None, "title", "Необходимо выбрать ровно 2 файла отчётов"
+            )
+
     def open_file_dialog1(self) -> None:
         """
         Открывает диалог выбора файла первого отчёта
         """
         self.btnFile1.setStyleSheet(self.styleSheet_btn_default)
         self.open_file_dialog(c.TITLE_OPEN_FIRST_REPORT, self.lblFilePath1)
-        self.btnFile2.setFocus()  # Приглашает открыть файл со вторым отчётом
+        f.set_focus(self.btnFile2)  # Приглашает открыть файл со вторым отчётом
 
     def open_file_dialog2(self) -> None:
         """
@@ -167,9 +190,7 @@ class MyWindow(QtWidgets.QMainWindow):
         )  # Восстанавливает стиль кнопки для случая, если раньше была ошибка
         self.open_file_dialog(c.TITLE_OPEN_SECOND_REPORT, self.lblFilePath2)
         # Приглашает приступить к сравнению отчётов
-        button = self.btnBox.button(QDialogButtonBox.StandardButton.Ok)
-        if button:
-            button.setFocus()
+        f.set_focus(self.btnBox.button(QDialogButtonBox.StandardButton.Ok))
 
     def setup_connections(self) -> None:
         """
@@ -178,7 +199,10 @@ class MyWindow(QtWidgets.QMainWindow):
         self.btnFile1.clicked.connect(self.open_file_dialog1)
         self.btnFile2.clicked.connect(self.open_file_dialog2)
         self.btnBox.clicked.connect(self.handle_button_click)
-        self.checkBoxFast.stateChanged.connect(self.on_checkbox_state_change)
+        self.checkBoxFast.stateChanged.connect(self.on_checkbox_fast_state_change)
+        self.checkBoxSuperFast.stateChanged.connect(
+            self.on_checkbox_super_fast_state_change
+        )
         self.checkBoxLoads.stateChanged.connect(self.on_checkbox_state_change)
         self.checkBoxComps.stateChanged.connect(self.on_checkbox_state_change)
         self.tBtnWorkingFolder.clicked.connect(self.set_working_folder)
@@ -192,16 +216,12 @@ class MyWindow(QtWidgets.QMainWindow):
         match self.btnBox.standardButton(button):
             case QDialogButtonBox.StandardButton.Ok:
                 self.on_click_OK()
-                btn = self.btnBox.button(QDialogButtonBox.StandardButton.Save)
-                if btn:
-                    btn.setFocus()
+                f.set_focus(self.btnBox.button(QDialogButtonBox.StandardButton.Save))
             case QDialogButtonBox.StandardButton.Save:
-                self.on_save()
-                btn = self.btnBox.button(QDialogButtonBox.StandardButton.Cancel)
-                if btn:
-                    btn.setFocus()
+                self.on_click_save()
+                f.set_focus(self.btnBox.button(QDialogButtonBox.StandardButton.Cancel))
             case QDialogButtonBox.StandardButton.Cancel:
-                f.on_cancel()
+                f.on_click_cancel()
 
     # noinspection PyPep8Naming
     def on_click_OK(self) -> None:
@@ -218,10 +238,41 @@ class MyWindow(QtWidgets.QMainWindow):
         if files_selected:
             self.sync_model_with_report_diffs()
 
+    def on_checkbox_fast_state_change(self):
+        """
+        Проверяет выбраны ли одновременно быстрый и сверхбыстрый диалог.
+        Если выбраны, то сверхбыстрый диалог отменяется, остаётся только быстрый.
+        Далее вызывается стандартная обработка чек боксов.
+        :return: None
+        """
+        if (
+            self.checkBoxSuperFast.checkState() == QtCore.Qt.CheckState.Checked
+            and self.checkBoxFast.checkState() == QtCore.Qt.CheckState.Checked
+        ):
+            self.checkBoxSuperFast.setCheckState(QtCore.Qt.CheckState.Unchecked)
+
+        self.on_checkbox_state_change()
+
+    def on_checkbox_super_fast_state_change(self) -> None:
+        """
+        Проверяет выбраны ли одновременно быстрый и сверхбыстрый диалог.
+        Если выбраны, то быстрый диалог отменяется, остаётся только сверхбыстрый.
+        Далее вызывается стандартная обработка чек боксов.
+        :return: None
+        """
+        if (
+            self.checkBoxSuperFast.checkState() == QtCore.Qt.CheckState.Checked
+            and self.checkBoxFast.checkState() == QtCore.Qt.CheckState.Checked
+        ):
+            self.checkBoxFast.setCheckState(QtCore.Qt.CheckState.Unchecked)
+
+        self.on_checkbox_state_change()
+
     def on_checkbox_state_change(self):
         """Обрабатывает изменение статуса любого чекбокса.
         Считывает статусы всех чек боксов и отдаёт их объекту работу с настройками"""
         self.checkbox_state_change(self.checkBoxFast, c.CHECK_BOX_FAST)
+        self.checkbox_state_change(self.checkBoxSuperFast, c.CHECK_BOX_SUPER_FAST)
         self.checkbox_state_change(self.checkBoxComps, c.CHECK_BOX_COMPS)
         self.checkbox_state_change(self.checkBoxLoads, c.CHECK_BOX_LOADS, write=True)
 
@@ -295,7 +346,7 @@ class MyWindow(QtWidgets.QMainWindow):
             self.tblResult.setSpan(0, 0, 1, len(c.LIST_HEADER_COLUMNS))
         self.customize_model()  # Обновление заголовков
 
-    def on_save(self) -> None:
+    def on_click_save(self) -> None:
         """Обработчик кнопки 'Сохранить'. Записывает модель в CSV файл и выдаёт
         предупреждение, если сравнение отчётов не выполнено.
         """
@@ -384,6 +435,22 @@ class MyWindow(QtWidgets.QMainWindow):
         if self.tunes.get_tune(c.CHECK_BOX_FAST) == c.CHECK_STATE_CHECKED:
             self.open_file_dialog1()
             self.open_file_dialog2()
+
+    def check_super_fast_dialogue(self) -> None:
+        """
+        Анализирует запрошен ли очень сокращённый диалог (выбор двух отчётов в одном диалоге).
+        Если запрошен, то в одном диалоге запрашивает два файла отчётов и организует их обработку
+        :return:
+        """
+        if self.tunes.get_tune(c.CHECK_BOX_SUPER_FAST) == c.CHECK_STATE_CHECKED:
+            files = self.open_files_dialog()
+            if len(files) == 0:
+                sys.exit(1000)
+            self.lblFilePath1.setText(files[0])
+            self.lblFilePath2.setText(files[1])
+            self.on_click_OK()
+            self.on_click_save()
+            f.set_focus(self.btnBox.button(QDialogButtonBox.StandardButton.Cancel))
 
     def set_working_folder(self) -> None:
         """

@@ -37,6 +37,7 @@ class Constant:
     TITLE_OPEN_FIRST_REPORT = "Первый отчёт"
     TITLE_OPEN_SECOND_REPORT = "Второй отчёт"
     TITLE_SET_WORKING_FOLDER = "Выбор рабочей директории"
+    TITLE_OPEN_TWO_FILES = "Выберите два файла отчётов"
 
     # Уточняющая информация о файлах отчётов
     TYPES_FILES_OPEN = "Текстовые файлы(*.txt);;Все файлы (*)"
@@ -73,6 +74,7 @@ class Constant:
 
     # Имена параметров
     CHECK_BOX_FAST = "checkBoxFast"
+    CHECK_BOX_SUPER_FAST = "checkBoxSuperFast"
     CHECK_BOX_COMPS = "checkBoxComps"
     CHECK_BOX_LOADS = "checkBoxLoads"
     WORKING_FOLDER = "working_folder"
