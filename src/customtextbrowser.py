@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt
 
 
 class CustomTextBrowser(QTextBrowser):
-    def __init__(self, parent):
+    def __init__(self, parent) -> None:
         super().__init__(parent)
         self.event_handler: typing.Callable | None = None
 

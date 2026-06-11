@@ -73,7 +73,7 @@ def parse_file(
     Raises:
         Exception: Если возникает ошибка при чтении файла.
     """
-    result = {}
+    result: dict[str, VS] = {}
     try:
         with open(file_path, "r", encoding=c.ENCODING_FILE) as file:
             for line in file:

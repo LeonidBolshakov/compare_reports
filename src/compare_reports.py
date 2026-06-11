@@ -5,6 +5,7 @@
 
 import sys
 import csv
+from enum import IntEnum
 
 from PyQt6 import QtWidgets, uic
 from PyQt6 import QtCore
@@ -33,13 +34,24 @@ sys.modules.setdefault("customtextbrowser", customtextbrowser)
 
 from PyQt6.QtCore import Qt
 
+
+class ChekState(IntEnum):
+    unchecked = 0
+    partiallychecked = 1
+    checked = 2
+
+
 DESCRIPTION_TUNES = {
-    c.CHECK_BOX_FAST: VT(Qt.CheckState.Unchecked.value, c.CHECK_BOX),
-    c.CHECK_BOX_SUPER_FAST: VT(Qt.CheckState.Unchecked.value, c.CHECK_BOX),
-    c.CHECK_BOX_COMPS: VT(Qt.CheckState.Checked.value, c.CHECK_BOX),
-    c.CHECK_BOX_LOADS: VT(Qt.CheckState.Unchecked.value, c.CHECK_BOX),
+    c.CHECK_BOX_FAST: VT(ChekState.unchecked.value, c.CHECK_BOX),
+    c.CHECK_BOX_SUPER_FAST: VT(ChekState.unchecked.value, c.CHECK_BOX),
+    c.CHECK_BOX_COMPS: VT(ChekState.checked.value, c.CHECK_BOX),
+    c.CHECK_BOX_LOADS: VT(ChekState.unchecked.value, c.CHECK_BOX),
     c.WORKING_FOLDER: VT("", c.STRING),
 }  # Имя настройки: (значение по умолчанию, метод контроля типа)
+
+UNCHECKED = 0
+PARTIALLYCHECKED = 1
+CHECKED = 2
 
 
 class MyWindow(QtWidgets.QMainWindow):
@@ -96,7 +108,8 @@ class MyWindow(QtWidgets.QMainWindow):
         """Устанавливает значения видимых частей виджетов"""
         self.lblFilePath1.setText("")
         self.lblFilePath2.setText("")
-        self.txtOutputFolder.setText(self.tunes.get_tune(c.WORKING_FOLDER))
+        working_folder = str(self.tunes.get_tune(c.WORKING_FOLDER))
+        self.txtOutputFolder.setText(working_folder)
         self.init_checkbox(self.checkBoxFast, c.CHECK_BOX_FAST)
         self.init_checkbox(self.checkBoxSuperFast, c.CHECK_BOX_SUPER_FAST)
         self.init_checkbox(self.checkBoxComps, c.CHECK_BOX_COMPS)
@@ -135,7 +148,7 @@ class MyWindow(QtWidgets.QMainWindow):
         """Настраивает внешний вид таблицы результатов"""
 
         header = self.tblResult.horizontalHeader()
-        if not header:
+        if header is None:
             return
 
         header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -171,7 +184,7 @@ class MyWindow(QtWidgets.QMainWindow):
         file_name, _ = QFileDialog.getOpenFileName(
             self,
             title,
-            self.tunes.get_tune(c.WORKING_FOLDER),
+            str(self.tunes.get_tune(c.WORKING_FOLDER)),
             c.TYPES_FILES_OPEN,
             options=QFileDialog.Option.DontUseNativeDialog,
         )
@@ -183,7 +196,7 @@ class MyWindow(QtWidgets.QMainWindow):
             filenames, _ = QFileDialog.getOpenFileNames(
                 self,
                 c.TITLE_OPEN_TWO_FILES,
-                self.tunes.get_tune(c.WORKING_FOLDER),
+                str(self.tunes.get_tune(c.WORKING_FOLDER)),
                 c.TYPES_FILES_OPEN,
                 options=QFileDialog.Option.DontUseNativeDialog,
             )
@@ -424,7 +437,7 @@ class MyWindow(QtWidgets.QMainWindow):
                 csv_row.append(self.model.data(index))
             writer.writerow(csv_row)
 
-    def add_data_to_model(self, items: list) -> None:
+    def add_data_to_model(self, items: list[str | int]) -> None:
         """
         Добавляет строку данных в модель таблицы
         :param items: Список элементов столбцов новой строки.
@@ -486,7 +499,7 @@ class MyWindow(QtWidgets.QMainWindow):
         worker_folder = QFileDialog.getExistingDirectory(
             self,
             c.TITLE_SET_WORKING_FOLDER,
-            self.tunes.get_tune(c.WORKING_FOLDER),
+            str(self.tunes.get_tune(c.WORKING_FOLDER)),
         )
 
         if worker_folder:

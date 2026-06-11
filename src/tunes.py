@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt
 
 import src.functions as f
 from src.constants import Constant as c
+from src.compare_reports import ChekState
 
 TuneValue = int | str
 
@@ -43,7 +44,9 @@ class Tunes:
         else:
             raise ValueError(f"{c.TEXT_NO_TUNES} - {name}")
 
-    def put_tune(self, name: str, value: TuneValue | Qt.CheckState, write: bool = False) -> None:
+    def put_tune(
+        self, name: str, value: TuneValue | Qt.CheckState, write: bool = False
+    ) -> None:
         """
         Запись настройки
         :param name: Имя настройки
@@ -83,7 +86,11 @@ class Tunes:
         match self.description_tunes[name].type:
             case "CheckBox":
                 if isinstance(value, Qt.CheckState):
-                    return value.value
+                    return (
+                        ChekState.checked.value
+                        if value == Qt.CheckState.Checked
+                        else ChekState.unchecked.value
+                    )
                 if isinstance(value, int):
                     check_state_value = value
                 elif isinstance(value, str) and value.isdigit():
@@ -106,8 +113,7 @@ class Tunes:
 
     def normalize_tunes(self, tunes: dict[str, TuneValue]) -> dict[str, TuneValue]:
         return {
-            key: self.normalize_tune_value(key, value)
-            for key, value in tunes.items()
+            key: self.normalize_tune_value(key, value) for key, value in tunes.items()
         }
 
     def is_validate(self, tunes: dict[str, TuneValue]) -> bool:
