@@ -1,0 +1,4 @@
+
+    Component name1 1.0 1000 path1
+    Component name2 2.0 2000 path2
+    

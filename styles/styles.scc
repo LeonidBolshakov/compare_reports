@@ -1,0 +1,5 @@
+STYLE_INPUT = """
+        background-color: #aaffff; /* Цвет фона */
+        color: #0000ff;            /* Цвет текста */
+    """  # Стиль для полей ввода (CSS)
+STYLE_ERROR = "background-color: #ffe6e6;"  # Стиль для ошибочных данных

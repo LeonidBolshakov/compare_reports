@@ -1,0 +1,1 @@
+{"checkBoxFast": 0, "checkBoxSuperFast": 2, "checkBoxComps": 2, "checkBoxLoads": 2, "working_folder": "C:\\Users\\LB\\Downloads"}
