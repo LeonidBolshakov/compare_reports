@@ -4,13 +4,13 @@
 
 import json
 from dataclasses import dataclass
+from enum import IntEnum
 
 from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtCore import Qt
 
 import src.functions as f
 from src.constants import Constant as c
-from src.compare_reports import ChekState
 
 TuneValue = int | str
 
@@ -19,6 +19,21 @@ TuneValue = int | str
 class VT:
     value: TuneValue  # Значение по умолчанию
     type: str  # Метод контроля типа
+
+
+class CheckStateValue(IntEnum):
+    UNCHECKED = 0
+    PARTIALLYCHECKED = 1
+    CHECKED = 2
+
+
+DESCRIPTION_TUNES = {
+    c.CHECK_BOX_FAST: VT(CheckStateValue.UNCHECKED.value, c.CHECK_BOX),
+    c.CHECK_BOX_SUPER_FAST: VT(CheckStateValue.UNCHECKED.value, c.CHECK_BOX),
+    c.CHECK_BOX_COMPS: VT(CheckStateValue.CHECKED.value, c.CHECK_BOX),
+    c.CHECK_BOX_LOADS: VT(CheckStateValue.UNCHECKED.value, c.CHECK_BOX),
+    c.WORKING_FOLDER: VT("", c.STRING),
+}  # Имя настройки: (значение по умолчанию, метод контроля типа)
 
 
 class Tunes:
@@ -44,9 +59,7 @@ class Tunes:
         else:
             raise ValueError(f"{c.TEXT_NO_TUNES} - {name}")
 
-    def put_tune(
-        self, name: str, value: TuneValue | Qt.CheckState, write: bool = False
-    ) -> None:
+    def put_tune(self, name: str, value: TuneValue, write: bool = False) -> None:
         """
         Запись настройки
         :param name: Имя настройки
@@ -56,9 +69,9 @@ class Tunes:
         """
         if not isinstance(name, str):
             raise ValueError(
-                f"{c.TEXT_ERROR_TYPE_TUNES}. Имя {name} Тип {type(name).__name__}"
+                f"{c.TEXT_ERROR_TYPE_TUNES_STR}. Имя {name} Тип {type(name).__name__}"
             )
-        self.dict_tunes[name] = self.normalize_tune_value(name, value)
+        self.dict_tunes[name] = value
 
         if write:
             self.write_tunes()
@@ -77,59 +90,6 @@ class Tunes:
         default_tunes[c.WORKING_FOLDER] = f.get_downloads_path()
         return default_tunes
 
-    def normalize_tune_value(
-        self, name: str, value: TuneValue | Qt.CheckState
-    ) -> TuneValue:
-        if name not in self.description_tunes:
-            raise ValueError(f"{c.TEXT_NO_TUNES} - {name}")
-
-        match self.description_tunes[name].type:
-            case "CheckBox":
-                if isinstance(value, Qt.CheckState):
-                    return (
-                        ChekState.checked.value
-                        if value == Qt.CheckState.Checked
-                        else ChekState.unchecked.value
-                    )
-                if isinstance(value, int):
-                    check_state_value = value
-                elif isinstance(value, str) and value.isdigit():
-                    check_state_value = int(value)
-                else:
-                    raise ValueError(f"{c.TEXT_ERROR_TYPE_TUNES}. {name}={value}")
-
-                if check_state_value not in (
-                    Qt.CheckState.Checked.value,
-                    Qt.CheckState.Unchecked.value,
-                ):
-                    raise ValueError(f"{c.TEXT_ERROR_TYPE_TUNES}. {name}={value}")
-                return check_state_value
-            case "String":
-                if not isinstance(value, str):
-                    raise ValueError(f"{c.TEXT_ERROR_TYPE_TUNES}. {name}={value}")
-                return value
-            case _:
-                raise ValueError(f"{c.TEXT_NO_TUNES} - {name}")
-
-    def normalize_tunes(self, tunes: dict[str, TuneValue]) -> dict[str, TuneValue]:
-        return {
-            key: self.normalize_tune_value(key, value) for key, value in tunes.items()
-        }
-
-    def is_validate(self, tunes: dict[str, TuneValue]) -> bool:
-        """
-        Проверка значений настроек из словаря настроек
-        :param tunes: Словарь настроек
-        :return:
-        """
-        if not isinstance(tunes, dict):
-            return False
-        try:
-            self.normalize_tunes(tunes)
-            return True
-        except ValueError:
-            return False
-
     def read_tunes(self) -> dict[str, TuneValue]:
         """
         Чтение словаря настроек из файла настроек.
@@ -140,17 +100,15 @@ class Tunes:
         # noinspection PyBroadException
         try:
             with open(c.FILE_TUNES, "r") as file:
-                tunes_from_file = json.load(file)
-                if self.is_validate(tunes_from_file):
-                    return self.normalize_tunes(tunes_from_file)
-                else:
-                    QMessageBox.warning(
-                        None, c.TITLE_ERROR_READ, f"{c.TEXT_ERROR_READ} - "
-                    )
+                return json.load(file)
         except FileNotFoundError:
             pass  # Отсутствие файла настроек не ошибка.
         except Exception as e:
-            QMessageBox.warning(None, c.TITLE_ERROR_READ, f"{c.TEXT_ERROR_READ}\n {e}")
+            QMessageBox.warning(
+                None,
+                c.TITLE_ERROR_READ,
+                f"{c.TEXT_ERROR_READ}\n {e}",
+            )
         return self.get_default_tunes()
 
     def write_tunes(self):
@@ -164,3 +122,44 @@ class Tunes:
                 json.dump(self.dict_tunes, file)
         except Exception as e:
             QMessageBox.warning(None, c.TITLE_ERROR_WRITE, f"{c.TEXT_ERROR_WRITE}\n{e}")
+
+    def normalize_tune_value(
+        self,
+        name: str,
+        value: TuneValue | Qt.CheckState,
+    ) -> TuneValue:
+        if name not in self.description_tunes:
+            raise ValueError(f"{c.TEXT_NO_TUNES} - {name}")
+
+        match self.description_tunes[name].type:
+            case c.CHECK_BOX:
+                if not isinstance(value, int):
+                    raise ValueError(f"{c.TEXT_ERROR_TYPE_TUNES_STR}. {name}={value}")
+
+                if value not in (
+                    CheckStateValue.CHECKED.value,
+                    CheckStateValue.UNCHECKED.value,
+                ):
+                    raise ValueError(f"{c.TEXT_ERROR_TYPE_TUNES_STR}. {name}={value}")
+
+                return value
+
+            case c.STRING:
+                if not isinstance(value, str):
+                    raise ValueError(f"{c.TEXT_ERROR_TYPE_TUNES_STR}. {name}={value}")
+                return value
+
+            case _:
+                raise ValueError(f"{c.TEXT_NO_TUNES} - {name}")
+
+    def normalize_tunes(self, tunes: dict[str, TuneValue]) -> dict[str, TuneValue]:
+        """
+        Проверяет и нормализует полный словарь настроек.
+        """
+        if set(tunes) != set(self.description_tunes):
+            raise ValueError(c.TEXT_ERROR_TYPE_TUNES)
+
+        return {
+            key: self.normalize_tune_value(key, tunes[key])
+            for key in self.description_tunes
+        }

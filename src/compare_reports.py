@@ -5,7 +5,6 @@
 
 import sys
 import csv
-from enum import IntEnum
 
 from PyQt6 import QtWidgets, uic
 from PyQt6 import QtCore
@@ -26,32 +25,13 @@ from PyQt6.QtWidgets import (
 from src.compare import parse_file, compare
 from src.constants import Constant as c
 import src.functions as f
-from src.tunes import VT, Tunes
+from src.tunes import Tunes, DESCRIPTION_TUNES
 import src.customtextbrowser as customtextbrowser
 from src.customtextbrowser import CustomTextBrowser
 
 sys.modules.setdefault("customtextbrowser", customtextbrowser)
 
 from PyQt6.QtCore import Qt
-
-
-class ChekState(IntEnum):
-    unchecked = 0
-    partiallychecked = 1
-    checked = 2
-
-
-DESCRIPTION_TUNES = {
-    c.CHECK_BOX_FAST: VT(ChekState.unchecked.value, c.CHECK_BOX),
-    c.CHECK_BOX_SUPER_FAST: VT(ChekState.unchecked.value, c.CHECK_BOX),
-    c.CHECK_BOX_COMPS: VT(ChekState.checked.value, c.CHECK_BOX),
-    c.CHECK_BOX_LOADS: VT(ChekState.unchecked.value, c.CHECK_BOX),
-    c.WORKING_FOLDER: VT("", c.STRING),
-}  # Имя настройки: (значение по умолчанию, метод контроля типа)
-
-UNCHECKED = 0
-PARTIALLYCHECKED = 1
-CHECKED = 2
 
 
 class MyWindow(QtWidgets.QMainWindow):
@@ -345,12 +325,10 @@ class MyWindow(QtWidgets.QMainWindow):
         """
         # Добавление данных в модель
         for item in only_in_1:
-            print(f"{item=}")
             self.add_data_to_model(
                 [item, records1[item].stamp, "", records1[item].size, ""],
             )
         for item in only_in_2:
-            print(f"{item=}")
             self.add_data_to_model(
                 [item, "", records2[item].stamp, "", records2[item].size]
             )
