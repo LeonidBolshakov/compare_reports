@@ -5,7 +5,7 @@
 from pathlib import Path
 import sys
 
-from PyQt6.QtWidgets import QPushButton, QApplication, QMessageBox
+from PyQt6.QtWidgets import QPushButton, QMessageBox
 from PyQt6.QtCore import QTimer
 
 from src.constants import Constant as c
@@ -29,11 +29,6 @@ def highlight_button_if_no_file(button: QPushButton) -> bool:
     """
     button.setStyleSheet(c.STYLE_ERROR_BUTTON)
     return False
-
-
-def on_click_cancel() -> None:
-    """Завершает работу приложения."""
-    QApplication.quit()
 
 
 def get_downloads_path() -> str:

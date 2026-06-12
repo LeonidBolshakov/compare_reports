@@ -6,15 +6,13 @@
 import re
 from dataclasses import dataclass
 
-from PyQt6.QtWidgets import QMessageBox
-
 from src.constants import Constant as c
 
 PREFIX_COMPONENT = "C: "
 PREFIX_LOAD = "L: "
 
 
-@dataclass(frozen=True, slots=False)
+@dataclass(frozen=True, slots=True)
 class VS:
     """Класс для хранения версии и размера компонента."""
 
@@ -74,18 +72,14 @@ def parse_file(
         Exception: Если возникает ошибка при чтении файла.
     """
     result: dict[str, VS] = {}
-    try:
-        with open(file_path, "r", encoding=c.ENCODING_FILE) as file:
-            for line in file:
-                if compare_loads:
-                    add_parsed_line_to_result(RE_PATTERN_LOADS, line, result)
+    with open(file_path, "r", encoding=c.ENCODING_FILE) as file:
+        for line in file:
+            if compare_loads:
+                add_parsed_line_to_result(RE_PATTERN_LOADS, line, result)
 
-                if compare_comps:
-                    add_parsed_line_to_result(RE_PATTERN_COMPONENTS, line, result)
+            if compare_comps:
+                add_parsed_line_to_result(RE_PATTERN_COMPONENTS, line, result)
 
-    except Exception as e:
-        QMessageBox.critical(None, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE}\n{e}")
-        raise e
     return result
 
 
@@ -133,9 +127,6 @@ def compare(
     only_in_1 = set(records1) - set(records2)
     only_in_2 = set(records2) - set(records1)
     differences = set(
-        k
-        for k in records1.keys() & records2.keys()
-        if records1[k].stamp != records2[k].stamp
-        or records1[k].size != records2[k].size
+        k for k in records1.keys() & records2.keys() if records1[k] != records2[k]
     )
     return only_in_1, only_in_2, differences

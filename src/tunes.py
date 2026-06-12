@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from enum import IntEnum
 
 from PyQt6.QtWidgets import QMessageBox
-from PyQt6.QtCore import Qt
 
 import src.functions as f
 from src.constants import Constant as c
@@ -114,7 +113,7 @@ class Tunes:
             )
         return self._get_default_tunes()
 
-    def _write_tunes(self):
+    def _write_tunes(self) -> None:
         """
         Запись словаря настроек в файл настроек
         :return:
@@ -189,5 +188,5 @@ class Tunes:
 
         return value
 
-    def is_cheked(self, tune_name: str) -> bool:
-        return self.get_int_tune(tune_name) == Qt.CheckState.Checked.value
+    def is_checked(self, tune_name: str) -> bool:
+        return self.get_int_tune(tune_name) == CheckStateValue.CHECKED.value

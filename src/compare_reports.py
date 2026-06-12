@@ -12,7 +12,7 @@ from enum import Enum, auto
 from PyQt6 import QtWidgets, uic
 from PyQt6 import QtCore
 from PyQt6.QtCore import QSortFilterProxyModel, Qt
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction
 from PyQt6.QtWidgets import (
     QFileDialog,
     QLabel,
@@ -42,6 +42,7 @@ class MyWindow(QtWidgets.QMainWindow):
     """Главное окно приложения."""
 
     # Явные аннотации типов для виджетов из .ui-файла
+    actionAbout: QAction
     btnBox: QDialogButtonBox
     btnFile1: QPushButton
     btnFile2: QPushButton
@@ -55,19 +56,19 @@ class MyWindow(QtWidgets.QMainWindow):
     btnOutputFolder: QToolButton
     txtOutputFolder: CustomTextBrowser
 
+    # 1. init
     def __init__(self) -> None:
         super().__init__()
         uic.loadUi(f.get_file_ui_name(), self)  # Загрузка интерфейса из .ui файла
 
         # Переменные объекта
-        self.saver_folder: Path | None = None
         self.dialogue_state: DialogueState = DialogueState.NORMAL
 
         # Устанавливает настройки программы
         self.tunes = Tunes(DESCRIPTION_TUNES)
 
         # Инициализация стилей и состояния
-        self.styleSheet_btn_default = self.btnFile1.styleSheet()
+        self.btn_file_default_style = self.btnFile1.styleSheet()
         self.was_comparison = False  # Флаг завершения выполнения сравнения отчётов
 
         # Настройка модели таблицы
@@ -80,57 +81,15 @@ class MyWindow(QtWidgets.QMainWindow):
         self.customize_interface()
         self.setup_connections()
 
-        # Быстрый диалог. Без нажатия кнопок инициации выбора файлов.
-        self.check_fast_dialogue()
+        # При необходимости - быстрый диалог.
+        self.run_fast_dialogues()
 
-        # Сверхбыстрый диалог. Выбор двух отчётов в одном диалоге.
-        self.check_super_fast_dialogue()
-
-    def setup_model(self):
+    # 2. Настройка окна
+    def setup_model(self) -> None:
         self.proxy.setSourceModel(self.model)
         # Сортируем по данным, имеющим UserRole
         self.proxy.setSortRole(Qt.ItemDataRole.UserRole)
         self.tblResult.setModel(self.proxy)
-
-    def init_widgets(self) -> None:
-        """Устанавливает значения видимых частей виджетов"""
-        self.lblFilePath1.setText("")
-        self.lblFilePath2.setText("")
-        saver_folder = self.tunes.get_str_tune(c.SAVER_FOLDER)
-        self.save_saver_folder(saver_folder)
-        self.init_checkbox(self.checkBoxFast, c.CHECK_BOX_FAST)
-        self.init_checkbox(self.checkBoxSuperFast, c.CHECK_BOX_SUPER_FAST)
-        self.init_checkbox(self.checkBoxComps, c.CHECK_BOX_COMPS)
-        self.init_checkbox(self.checkBoxLoads, c.CHECK_BOX_LOADS)
-
-    def init_checkbox(self, checkbox, name_value):
-        checkbox.setCheckState(
-            QtCore.Qt.CheckState.Checked
-            if self.tunes.is_cheked(name_value)
-            else QtCore.Qt.CheckState.Unchecked
-        )
-
-    def customize_interface(self) -> None:
-        """Настраивает текст кнопок, внешний вид таблицы, значения виджетов"""
-
-        # Переименование кнопок и назначение им свойства AutoDefault
-        buttons = {
-            QDialogButtonBox.StandardButton.Ok: c.TEXT_BUTTON_COMPARE,
-            QDialogButtonBox.StandardButton.Save: c.TEXT_BUTTON_SAVE,
-            QDialogButtonBox.StandardButton.Cancel: c.TEXT_BUTTON_QUIT,
-        }
-        for btn_type, text in buttons.items():
-            button = self.btnBox.button(btn_type)
-            if button:
-                button.setText(text)
-                button.setAutoDefault(False)
-                button.setDefault(False)
-
-        # Настраиваем таблицу для просмотра
-        self.setup_table_view()
-
-        # Инициализируем значения виджетов
-        self.init_widgets()
 
     def setup_table_view(self) -> None:
         """Настраивает внешний вид таблицы результатов"""
@@ -156,11 +115,67 @@ class MyWindow(QtWidgets.QMainWindow):
 
         f.set_bold(header)
 
-    def customize_model(self) -> None:
-        """Устанавливает шапки в таблице модели"""
-        self.model.setHorizontalHeaderLabels(c.LIST_HEADER_COLUMNS)
+    def customize_interface(self) -> None:
+        """Настраивает текст кнопок, внешний вид таблицы, значения виджетов"""
+
+        # Переименование кнопок и назначение им свойства AutoDefault
+        buttons = {
+            QDialogButtonBox.StandardButton.Ok: c.TEXT_BUTTON_COMPARE,
+            QDialogButtonBox.StandardButton.Save: c.TEXT_BUTTON_SAVE,
+            QDialogButtonBox.StandardButton.Cancel: c.TEXT_BUTTON_QUIT,
+        }
+        for btn_type, text in buttons.items():
+            button = self.btnBox.button(btn_type)
+            if button:
+                button.setText(text)
+                button.setAutoDefault(False)
+                button.setDefault(False)
+
+        # Настраиваем таблицу для просмотра
         self.setup_table_view()
 
+        # Инициализируем значения виджетов
+        self.init_widgets()
+
+    def setup_connections(self) -> None:
+        """
+        Устанавливает соответствия между сигналами и слотами
+        """
+        self.btnFile1.clicked.connect(self.select_first_report)
+        self.btnFile2.clicked.connect(self.select_second_report)
+
+        self.checkBoxComps.stateChanged.connect(self.on_checkbox_state_change)
+        self.checkBoxLoads.stateChanged.connect(self.on_checkbox_state_change)
+        self.checkBoxFast.stateChanged.connect(self.on_checkbox_fast_state_change)
+        self.checkBoxSuperFast.stateChanged.connect(
+            self.on_checkbox_super_fast_state_change
+        )
+
+        self.btnOutputFolder.clicked.connect(self.set_saver_folder)
+        self.txtOutputFolder.connect(self.set_saver_folder)
+
+        self.btnBox.clicked.connect(self.handle_button_click)
+        self.actionAbout.triggered.connect(self.show_about_dialog)
+
+    def init_widgets(self) -> None:
+        """Устанавливает значения видимых частей виджетов"""
+        self.lblFilePath1.setText("")
+        self.lblFilePath2.setText("")
+        saver_folder = self.tunes.get_str_tune(c.SAVER_FOLDER)
+        self.save_saver_folder(saver_folder)
+        self.init_checkbox(self.checkBoxFast, c.CHECK_BOX_FAST)
+        self.init_checkbox(self.checkBoxSuperFast, c.CHECK_BOX_SUPER_FAST)
+        self.init_checkbox(self.checkBoxComps, c.CHECK_BOX_COMPS)
+        self.init_checkbox(self.checkBoxLoads, c.CHECK_BOX_LOADS)
+
+    def init_checkbox(self, checkbox, name_value):
+        checkbox.setCheckState(
+            QtCore.Qt.CheckState.Checked
+            if self.tunes.is_checked(name_value)
+            else QtCore.Qt.CheckState.Unchecked
+        )
+
+    # 3. Диалоги выбора файлов и папок
     def open_file_dialog(self, title: str, label: QLabel) -> None:
         """
         Открывает диалог выбора файла и записывает путь выбранного файла в метку.
@@ -172,7 +187,7 @@ class MyWindow(QtWidgets.QMainWindow):
         file_name, _ = QFileDialog.getOpenFileName(
             self,
             title,
-            str(self.tunes.get_str_tune(c.SAVER_FOLDER)),
+            self.tunes.get_str_tune(c.SAVER_FOLDER),
             c.TYPES_FILES_OPEN,
             options=QFileDialog.Option.DontUseNativeDialog,
         )
@@ -194,11 +209,30 @@ class MyWindow(QtWidgets.QMainWindow):
                 None, "Предупреждение", "Необходимо выбрать ровно 2 файла отчётов"
             )
 
+    def set_saver_folder(self) -> None:
+        """
+        Запрашивает у Пользователя рабочую папку.
+        При отказе от выбора папки путь на рабочую папку остаётся прежним.
+        :return: None
+        """
+        saver_folder = QFileDialog.getExistingDirectory(
+            self,
+            c.TITLE_SET_SAVER_FOLDER,
+            str(self.tunes.get_str_tune(c.SAVER_FOLDER)),
+        )
+
+        if saver_folder:
+            self.save_saver_folder(saver_folder)
+
+    def save_saver_folder(self, saver_folder: str) -> None:
+        self.txtOutputFolder.setText(saver_folder)
+        self.tunes.put_tune(c.SAVER_FOLDER, saver_folder, write=True)
+
     def select_first_report(self) -> None:
         """
         Открывает диалог выбора файла первого отчёта
         """
-        self.btnFile1.setStyleSheet(self.styleSheet_btn_default)
+        self.btnFile1.setStyleSheet(self.btn_file_default_style)
         self.open_file_dialog(c.TITLE_OPEN_FIRST_REPORT, self.lblFilePath1)
         f.set_focus(self.btnFile2)  # Приглашает открыть файл со вторым отчётом
 
@@ -207,28 +241,13 @@ class MyWindow(QtWidgets.QMainWindow):
         Открывает диалог выбора файла второго отчёта
         """
         self.btnFile2.setStyleSheet(
-            self.styleSheet_btn_default
+            self.btn_file_default_style
         )  # Восстанавливает стиль кнопки для случая, если раньше была ошибка
         self.open_file_dialog(c.TITLE_OPEN_SECOND_REPORT, self.lblFilePath2)
         # Приглашает приступить к сравнению отчётов
         f.set_focus(self.btnBox.button(QDialogButtonBox.StandardButton.Ok))
 
-    def setup_connections(self) -> None:
-        """
-        Устанавливает соответствия между сигналами и слотами
-        """
-        self.btnFile1.clicked.connect(self.select_first_report)
-        self.btnFile2.clicked.connect(self.select_second_report)
-        self.btnBox.clicked.connect(self.handle_button_click)
-        self.checkBoxFast.stateChanged.connect(self.on_checkbox_fast_state_change)
-        self.checkBoxSuperFast.stateChanged.connect(
-            self.on_checkbox_super_fast_state_change
-        )
-        self.checkBoxLoads.stateChanged.connect(self.on_checkbox_state_change)
-        self.checkBoxComps.stateChanged.connect(self.on_checkbox_state_change)
-        self.btnOutputFolder.clicked.connect(self.set_saver_folder)
-        self.txtOutputFolder.connect(self.set_saver_folder)
-
+    # 4. Обработчики UI
     def handle_button_click(self, button: QPushButton) -> None:
         """
         Проводит обработку нажатия кнопок из стандартного блока кнопок
@@ -242,9 +261,8 @@ class MyWindow(QtWidgets.QMainWindow):
                 self.save_results()
                 f.set_focus(self.btnBox.button(QDialogButtonBox.StandardButton.Cancel))
             case QDialogButtonBox.StandardButton.Cancel:
-                f.on_click_cancel()
+                QtWidgets.QApplication.quit()
 
-    # noinspection PyPep8Naming
     def compare_reports(self) -> None:
         """Разбор и сравнение файлов отчётов."""
         self.model.clear()
@@ -311,6 +329,84 @@ class MyWindow(QtWidgets.QMainWindow):
             write,
         )
 
+    def save_results(self) -> None:
+        """Обработчик кнопки 'Сохранить'. Записывает модель в CSV файл и выдаёт
+        предупреждение, если сравнение отчётов не выполнено.
+        """
+        if not self.was_comparison:
+            QMessageBox.warning(self, c.TITLE_RESAVE, c.TEXT_RESAVE)
+            return
+
+        try:
+            # Запись данных модели в csv филе
+            file_path = self.get_result_file_path()
+
+            with open(file_path, "w", newline="", encoding="utf-8-sig") as csv_file:
+                writer = csv.writer(csv_file, delimiter=";")
+                writer.writerow(c.LIST_HEADER_COLUMNS)
+                self.write_model_to_csv(writer)
+
+        except Exception as e:
+            QMessageBox.critical(self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE}\n{e}")
+            return
+
+        self.was_comparison = False
+        wait = self.get_wait_ms()
+        f.show_message(self, f"Отчёт сохранён по пути\n{file_path}", wait=wait)
+
+    # 5. Сравнение и заполнение таблицы
+    def sync_model_with_report_diffs(self) -> None:
+        """Получает нужные записи из отчётов, инициирует их
+        сравнение и заселение модели отличиями в отчётах
+        """
+        compare_comps = self.tunes.is_checked(c.CHECK_BOX_COMPS)
+        compare_loads = self.tunes.is_checked(c.CHECK_BOX_LOADS)
+
+        if not compare_comps and not compare_loads:
+            # Не выбран ни один из вариантов сравнения
+            QMessageBox.warning(self, c.TITLE_NO_COMP, c.TEXT_NO_COMP)
+            return
+
+        try:
+            records1 = parse_file(
+                self.lblFilePath1.text(),
+                compare_comps,
+                compare_loads,
+            )
+            records2 = parse_file(
+                self.lblFilePath2.text(),
+                compare_comps,
+                compare_loads,
+            )
+            only_in_1, only_in_2, differences = compare(records1, records2)
+
+            self.populate_model(records1, records2, only_in_1, only_in_2, differences)
+            self.was_comparison = True
+        except Exception as e:
+            QMessageBox.critical(self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE}\n{e}")
+
+    def make_only_in_first_row(
+        self, item: str, records1: dict[str, VS]
+    ) -> list[str | int]:
+        record = records1[item]
+        return [item, record.stamp, "", record.size, ""]
+
+    def make_only_in_second_row(
+        self, item: str, records2: dict[str, VS]
+    ) -> list[str | int]:
+        record = records2[item]
+        return [item, "", record.stamp, "", record.size]
+
+    def make_difference_row(
+        self,
+        item: str,
+        records1: dict[str, VS],
+        records2: dict[str, VS],
+    ) -> list[str | int]:
+        record1 = records1[item]
+        record2 = records2[item]
+        return [item, record1.stamp, record2.stamp, record1.size, record2.size]
+
     def populate_model(
         self,
         records1: dict[str, VS],
@@ -332,26 +428,43 @@ class MyWindow(QtWidgets.QMainWindow):
         :return: None
         """
         # Добавление данных в модель
-        for item in only_in_1:
-            self.add_data_to_model(
-                [item, records1[item].stamp, "", records1[item].size, ""],
-            )
-        for item in only_in_2:
-            self.add_data_to_model(
-                [item, "", records2[item].stamp, "", records2[item].size]
-            )
-        for item in differences:
-            self.add_data_to_model(
-                [
-                    item,
-                    records1[item].stamp,
-                    records2[item].stamp,
-                    records1[item].size,
-                    records2[item].size,
-                ]
-            )
+        for item in sorted(only_in_1):
+            self.add_data_to_model(self.make_only_in_first_row(item, records1))
+
+        for item in sorted(only_in_2):
+            self.add_data_to_model(self.make_only_in_second_row(item, records2))
+
+        for item in sorted(differences):
+            self.add_data_to_model(self.make_difference_row(item, records1, records2))
 
         self.check_empty_data()
+
+    def add_data_to_model(self, items: list[str | int]) -> None:
+        """
+        Добавляет строку данных в модель таблицы
+        :param items: Список элементов столбцов новой строки.
+                      Элементами могут быть как строки, так и целые числа.
+        :return: None
+        """
+        row_items = []
+        for value in items:
+            item = QStandardItem()
+            item.setData(value, Qt.ItemDataRole.UserRole)
+
+            if isinstance(value, int):
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                display_value = f"{value:,}".replace(",", "'")
+            else:
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+                )
+                display_value = str(value)
+
+            item.setData(display_value, Qt.ItemDataRole.DisplayRole)
+            row_items.append(item)
+        self.model.appendRow(row_items)
 
     def check_empty_data(self) -> None:
         """
@@ -361,61 +474,20 @@ class MyWindow(QtWidgets.QMainWindow):
         if not self.model.rowCount():
             self.add_data_to_model([c.TEXT_SUCCESSFUL_COMPARISON])
             self.tblResult.setSpan(0, 0, 1, len(c.LIST_HEADER_COLUMNS))
-        self.customize_model()  # Обновление заголовков
+        self.setup_model_headers()  # Обновление заголовков
 
-    def save_results(self) -> None:
-        """Обработчик кнопки 'Сохранить'. Записывает модель в CSV файл и выдаёт
-        предупреждение, если сравнение отчётов не выполнено.
-        """
-        if not self.was_comparison:
-            QMessageBox.warning(self, c.TITLE_RESAVE, c.TEXT_RESAVE)
-            return
+    def setup_model_headers(self) -> None:
+        """Устанавливает шапки в таблице модели"""
+        self.model.setHorizontalHeaderLabels(c.LIST_HEADER_COLUMNS)
+        self.setup_table_view()
 
-        self.was_comparison = False
-        try:
-            # Запись данных модели в csv филе
-            file_path = self.get_result_file_path()
+    # 6. CSV
+    def get_result_file_path(self) -> Path:
+        output_folder = Path(self.tunes.get_str_tune(c.SAVER_FOLDER))
+        time_stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_name = f"compare_{time_stamp}.csv"
 
-            with open(file_path, "w", newline="") as csv_file:
-                writer = csv.writer(csv_file, delimiter=";")
-                writer.writerow(c.LIST_HEADER_COLUMNS)
-                self.write_model_to_csv(writer)
-
-        except Exception as e:
-            QMessageBox.critical(self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE}\n{e}")
-            return
-        wait = self.get_wait_ms()
-
-        f.show_message(self, f"Отчёт сохранён по пути\n{file_path}", wait=wait)
-
-    def sync_model_with_report_diffs(self) -> None:
-        """Получает нужные записи из отчётов, инициирует их
-        сравнение и заселение модели отличиями в отчётах
-        """
-        if (
-            self.tunes.get_int_tune(c.CHECK_BOX_COMPS) == Qt.CheckState.Unchecked.value
-            and self.tunes.get_int_tune(c.CHECK_BOX_LOADS)
-            == Qt.CheckState.Unchecked.value
-        ):  # Не выбран ни один из вариантов сравнения
-            QMessageBox.warning(self, c.TITLE_NO_COMP, c.TEXT_NO_COMP)
-            return
-        try:
-            records1 = parse_file(
-                self.lblFilePath1.text(),
-                self.tunes.is_cheked(c.CHECK_BOX_COMPS),
-                self.tunes.is_cheked(c.CHECK_BOX_LOADS),
-            )
-            records2 = parse_file(
-                self.lblFilePath2.text(),
-                self.tunes.is_cheked(c.CHECK_BOX_COMPS),
-                self.tunes.is_cheked(c.CHECK_BOX_LOADS),
-            )
-            only_in_1, only_in_2, differences = compare(records1, records2)
-
-            self.populate_model(records1, records2, only_in_1, only_in_2, differences)
-            self.was_comparison = True
-        except Exception as e:
-            QMessageBox.critical(self, c.TITLE_ERROR_FILE, f"{c.TEXT_ERROR_FILE}\n{e}")
+        return output_folder / file_name
 
     def write_model_to_csv(self, writer) -> None:
         """
@@ -430,51 +502,25 @@ class MyWindow(QtWidgets.QMainWindow):
                 csv_row.append(self.model.data(index))
             writer.writerow(csv_row)
 
-    def add_data_to_model(self, items: list[str | int]) -> None:
-        """
-        Добавляет строку данных в модель таблицы
-        :param items: Список элементов столбцов новой строки.
-                      Элементами могут быть как строки, так и целые числа.
-        :return: None
-        """
-        row_items = []
-        for v_item in items:
-            item = QStandardItem()
-            item.setData(v_item, Qt.ItemDataRole.UserRole)
-
-            if isinstance(v_item, int):
-                item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
-                v_item_str = f"{v_item:,}".replace(",", "'")
-            else:
-                item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-                )
-                v_item_str = str(v_item)
-
-            item.setData(v_item_str, Qt.ItemDataRole.DisplayRole)
-            row_items.append(item)
-        self.model.appendRow(row_items)
-
-    def check_fast_dialogue(self) -> None:
+    # 7. Быстрые режимы
+    def run_fast_dialogue(self) -> None:
         """
         Анализирует запрошен ли сокращённый диалог
         и если запрошен то имитирует нажатие кнопок выбора файлов
         :return: None
         """
-        if self.tunes.is_cheked(c.CHECK_BOX_FAST):
+        if self.tunes.is_checked(c.CHECK_BOX_FAST):
             self.dialogue_state = DialogueState.FAST
             self.select_first_report()
             self.select_second_report()
 
-    def check_super_fast_dialogue(self) -> None:
+    def run_super_fast_dialogue(self) -> None:
         """
         Анализирует запрошен ли очень быстрый диалог (выбор двух отчётов в одном диалоге).
         Если запрошен, то в одном диалоге запрашивает два файла отчётов и организует их обработку
         :return:
         """
-        if self.tunes.is_cheked(c.CHECK_BOX_SUPER_FAST):
+        if self.tunes.is_checked(c.CHECK_BOX_SUPER_FAST):
             self.dialogue_state = DialogueState.SUPER_FAST
             files = self.open_files_dialog()
             if not files:
@@ -486,33 +532,6 @@ class MyWindow(QtWidgets.QMainWindow):
             self.save_results()
             f.set_focus(self.btnBox.button(QDialogButtonBox.StandardButton.Cancel))
 
-    def set_saver_folder(self) -> None:
-        """
-        Запрашивает у Пользователя рабочую папку.
-        При отказе от выбора папки путь на рабочую папку остаётся прежним.
-        :return: None
-        """
-        saver_folder = QFileDialog.getExistingDirectory(
-            self,
-            c.TITLE_SET_SAVER_FOLDER,
-            str(self.tunes.get_str_tune(c.SAVER_FOLDER)),
-        )
-
-        if saver_folder:
-            self.save_saver_folder(saver_folder)
-
-    def save_saver_folder(self, saver_folder: str) -> None:
-        self.saver_folder = Path(saver_folder)
-        self.txtOutputFolder.setText(saver_folder)
-        self.tunes.put_tune(c.SAVER_FOLDER, saver_folder, write=True)
-
-    def get_result_file_path(self) -> Path:
-        output_folder = Path(self.tunes.get_str_tune(c.SAVER_FOLDER))
-        time_stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        file_name = f"compare_{time_stamp}.csv"
-
-        return output_folder / file_name
-
     def get_wait_ms(self) -> int:
         match self.dialogue_state:
             case DialogueState.NORMAL:
@@ -521,6 +540,50 @@ class MyWindow(QtWidgets.QMainWindow):
                 return 1000
             case DialogueState.SUPER_FAST:
                 return 0
+
+    def run_fast_dialogues(self) -> None:
+        """Запускает быстрый или сверхбыстрый сценарий выбора отчётов."""
+        if self.tunes.is_checked(c.CHECK_BOX_SUPER_FAST):
+            self.run_super_fast_dialogue()
+        elif self.tunes.is_checked(c.CHECK_BOX_FAST):
+            self.run_fast_dialogue()
+
+    def show_about_dialog(self) -> None:
+        QMessageBox.about(
+            self,
+            "О программе",
+            """
+            <h3>Compare Reports</h3>
+
+            <p>
+            Программа сравнивает полученные с разных установок системы
+            «Галактика» отчёты:
+            </p>
+
+            <ul>
+                <li>сводный отчёт о компонентах;</li>
+                <li>полный отчёт о компонентах;</li>
+                <li>отчёт о рабочей станции.</li>
+            </ul>
+
+            <p>
+            В результате сравнения для компонентов и загруженных модулей отображаются различия 
+            в версиях, датах и размерах.
+            </p>
+
+            <p><b>Основные возможности:</b></p>
+
+            <ul>
+                <li>сравнение версий, дат и размеров компонентов;</li>
+                <li>быстрый и сверхбыстрый режимы выбора отчётов;</li>
+                <li>сохранение результатов сравнения в CSV-файл,
+                открываемый в Microsoft Excel.</li>
+            </ul>
+
+            <p>Автор: Большаков Л.А.</p>
+            <p>Версия: 1.0<br>Июнь 2026 года</p>
+            """,
+        )
 
 
 if __name__ == "__main__":
