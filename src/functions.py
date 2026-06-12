@@ -5,7 +5,8 @@
 from pathlib import Path
 import sys
 
-from PyQt6.QtWidgets import QPushButton, QApplication
+from PyQt6.QtWidgets import QPushButton, QApplication, QMessageBox
+from PyQt6.QtCore import QTimer
 
 from src.constants import Constant as c
 
@@ -77,3 +78,21 @@ def get_base_dir(folder_level: int = 1) -> Path:
 def get_file_ui_name() -> Path:
     base_dir = get_base_dir()
     return base_dir / "_Internal" / c.FILE_UI_NAME
+
+
+def show_message(parent, text: str, wait: int) -> None:
+    """
+    Отображает всплывающее сообщение.
+    Сообщение автоматически закрывается через заданное в параметре время.
+    Параметры:
+    text - текст выводимого сообщения
+    wait - максимальное время нахождения сообщения на экране в мс
+    Если wait <= 0, сообщение не показывается.
+    """
+    # Создаём окно сообщения
+    msg_box = QMessageBox(parent)
+    msg_box.setText(text)
+    msg_box.show()
+
+    # Для закрытия окна устанавливаем таймер
+    QTimer.singleShot(wait, msg_box.accept)

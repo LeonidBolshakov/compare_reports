@@ -454,7 +454,7 @@
               </palette>
              </property>
              <property name="text">
-              <string>Папка выгрузки отчёта несоответствий</string>
+              <string>Папка загрузи входных отчётов и выгрузки отчёта несоответствий</string>
              </property>
             </widget>
            </item>
@@ -484,7 +484,7 @@
              <set>QTextEdit::AutoFormattingFlag::AutoAll</set>
             </property>
             <property name="placeholderText">
-             <string>Нажмите кнопку справа и выбирете директорию</string>
+             <string>Дважды кликните сюда или нажмите кнопку справа и выберете директорию</string>
             </property>
            </widget>
           </item>
@@ -624,7 +624,7 @@
          </font>
         </property>
         <property name="text">
-         <string>Результаты сравгнения</string>
+         <string>Результаты сравнения</string>
         </property>
        </widget>
       </item>

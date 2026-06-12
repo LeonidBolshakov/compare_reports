@@ -43,7 +43,7 @@ def test_tunes(tmp_path, monkeypatch):
         c.CHECK_BOX_SUPER_FAST: Qt.CheckState.Unchecked.value,
         c.CHECK_BOX_COMPS: Qt.CheckState.Checked.value,
         c.CHECK_BOX_LOADS: Qt.CheckState.Unchecked.value,
-        c.WORKING_FOLDER: str(tmp_path),
+        c.SAVER_FOLDER: str(tmp_path),
     }
     monkeypatch.setattr(Tunes, "read_tunes", lambda self: tunes.copy())
 
@@ -96,7 +96,7 @@ class TestMainWindow:
 
         with mock.patch("PyQt6.QtWidgets.QFileDialog.getOpenFileName") as mock_dialog:
             mock_dialog.return_value = (file1, None)
-            window.open_file_dialog1()
+            window.select_first_report()
 
             assert window.lblFilePath1.text() == file1
             assert "test1.csv" in window.lblFilePath1.text()
@@ -106,7 +106,7 @@ class TestMainWindow:
         window.lblFilePath1.setText(file1)
         window.lblFilePath2.setText(file2)
 
-        window.on_click_OK()
+        window.compare_reports()
 
         assert window.model.rowCount() == 3
         assert window.was_comparison is True
@@ -115,12 +115,12 @@ class TestMainWindow:
         file1, file2 = test_files
         window.lblFilePath1.setText(file1)
         window.lblFilePath2.setText(file2)
-        window.on_click_OK()
+        window.compare_reports()
 
         monkeypatch.chdir(tmp_path)
         save_path = tmp_path / "save.csv"
 
-        window.on_click_save()
+        window.save_results()
 
         assert os.path.exists(save_path)
 
@@ -133,7 +133,7 @@ class TestMainWindow:
 # Тесты обработки ошибок
 class TestErrorHandling:
     def test_missing_files_error(self, window):
-        window.on_click_OK()
+        window.compare_reports()
         assert window.model.rowCount() == 0
 
     def test_corrupted_file_handling(self, window, tmp_path):
@@ -144,5 +144,5 @@ class TestErrorHandling:
         window.lblFilePath1.setText(str(bad_file))
         window.lblFilePath2.setText(str(bad_file))
 
-        window.on_click_OK()
+        window.compare_reports()
         assert window.model.rowCount() == 1

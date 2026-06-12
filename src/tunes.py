@@ -23,7 +23,7 @@ class VT:
 
 class CheckStateValue(IntEnum):
     UNCHECKED = 0
-    PARTIALLYCHECKED = 1
+    PARTIALLY_CHECKED = 1
     CHECKED = 2
 
 
@@ -32,7 +32,7 @@ DESCRIPTION_TUNES = {
     c.CHECK_BOX_SUPER_FAST: VT(CheckStateValue.UNCHECKED.value, c.CHECK_BOX),
     c.CHECK_BOX_COMPS: VT(CheckStateValue.CHECKED.value, c.CHECK_BOX),
     c.CHECK_BOX_LOADS: VT(CheckStateValue.UNCHECKED.value, c.CHECK_BOX),
-    c.WORKING_FOLDER: VT("", c.STRING),
+    c.SAVER_FOLDER: VT("", c.STRING),
 }  # Имя настройки: (значение по умолчанию, метод контроля типа)
 
 
@@ -46,9 +46,9 @@ class Tunes:
         """
 
         self.description_tunes = description_tunes
-        self.dict_tunes: dict[str, TuneValue] = self.read_tunes()  # словарь настроек
+        self.dict_tunes: dict[str, TuneValue] = self._read_tunes()  # словарь настроек
 
-    def get_tune(self, name: str) -> TuneValue:
+    def _get_tune(self, name: str) -> TuneValue:
         """
         Получение настройки
         :param name: Имя настройки
@@ -71,12 +71,12 @@ class Tunes:
             raise ValueError(
                 f"{c.TEXT_ERROR_TYPE_TUNES_STR}. Имя {name} Тип {type(name).__name__}"
             )
-        self.dict_tunes[name] = value
+        self.dict_tunes[name] = self._normalize_tune_value(name, value)
 
         if write:
-            self.write_tunes()
+            self._write_tunes()
 
-    def get_default_tunes(self) -> dict[str, TuneValue]:
+    def _get_default_tunes(self) -> dict[str, TuneValue]:
         """
         Возвращает словарь настроек, со значениями по умолчанию
         :return: Словарь настроек, со значениями по умолчанию
@@ -85,12 +85,12 @@ class Tunes:
             key: self.description_tunes[key].value
             for key in self.description_tunes.keys()
         }
-        #  У настройки WORKING_FOLDER значение по умолчанию - путь к папке Downloads.
+        #  У настройки SAVER_FOLDER значение по умолчанию - путь к папке Downloads.
         #  Путь к Downloads может быть разным на разных компьютерах, поэтому он формируется программно.
-        default_tunes[c.WORKING_FOLDER] = f.get_downloads_path()
+        default_tunes[c.SAVER_FOLDER] = f.get_downloads_path()
         return default_tunes
 
-    def read_tunes(self) -> dict[str, TuneValue]:
+    def _read_tunes(self) -> dict[str, TuneValue]:
         """
         Чтение словаря настроек из файла настроек.
         Если с чтением файла проблемы - словарь формируется значениями настроек по умолчанию.
@@ -100,7 +100,10 @@ class Tunes:
         # noinspection PyBroadException
         try:
             with open(c.FILE_TUNES, "r") as file:
-                return json.load(file)
+                tunes_from_file = json.load(file)
+
+            return self._normalize_tunes(tunes_from_file)
+
         except FileNotFoundError:
             pass  # Отсутствие файла настроек не ошибка.
         except Exception as e:
@@ -109,9 +112,9 @@ class Tunes:
                 c.TITLE_ERROR_READ,
                 f"{c.TEXT_ERROR_READ}\n {e}",
             )
-        return self.get_default_tunes()
+        return self._get_default_tunes()
 
-    def write_tunes(self):
+    def _write_tunes(self):
         """
         Запись словаря настроек в файл настроек
         :return:
@@ -123,11 +126,11 @@ class Tunes:
         except Exception as e:
             QMessageBox.warning(None, c.TITLE_ERROR_WRITE, f"{c.TEXT_ERROR_WRITE}\n{e}")
 
-    def normalize_tune_value(
+    def _normalize_tune_value(
         self,
         name: str,
-        value: TuneValue | Qt.CheckState,
-    ) -> TuneValue:
+        value: TuneValue,
+    ) -> str | int:
         if name not in self.description_tunes:
             raise ValueError(f"{c.TEXT_NO_TUNES} - {name}")
 
@@ -152,14 +155,39 @@ class Tunes:
             case _:
                 raise ValueError(f"{c.TEXT_NO_TUNES} - {name}")
 
-    def normalize_tunes(self, tunes: dict[str, TuneValue]) -> dict[str, TuneValue]:
+    def _normalize_tunes(self, tunes: dict[str, TuneValue]) -> dict[str, TuneValue]:
         """
         Проверяет и нормализует полный словарь настроек.
         """
+
+        if not isinstance(tunes, dict):
+            raise ValueError(c.TEXT_ERROR_TYPE_TUNES)
+
         if set(tunes) != set(self.description_tunes):
             raise ValueError(c.TEXT_ERROR_TYPE_TUNES)
 
         return {
-            key: self.normalize_tune_value(key, tunes[key])
+            key: self._normalize_tune_value(key, tunes[key])
             for key in self.description_tunes
         }
+
+    def get_str_tune(self, name: str) -> str:
+        value = self._get_tune(name)
+        if not isinstance(value, str):
+            raise ValueError(
+                f"Настройка {name} должна быть строкой, получено {type(value).__name__}"
+            )
+
+        return value
+
+    def get_int_tune(self, name: str) -> int:
+        value = self._get_tune(name)
+        if not isinstance(value, int):
+            raise ValueError(
+                f"Настройка {name} должна быть целым числом, получено {type(value).__name__}"
+            )
+
+        return value
+
+    def is_cheked(self, tune_name: str) -> bool:
+        return self.get_int_tune(tune_name) == Qt.CheckState.Checked.value

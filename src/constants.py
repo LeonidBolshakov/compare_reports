@@ -36,7 +36,7 @@ class Constant:
     # Заголовки диалогов открытия файлов и директорий
     TITLE_OPEN_FIRST_REPORT = "Первый отчёт"
     TITLE_OPEN_SECOND_REPORT = "Второй отчёт"
-    TITLE_SET_WORKING_FOLDER = "Выбор рабочей директории"
+    TITLE_SET_SAVER_FOLDER = "Выбор директории сохранения результата"
     TITLE_OPEN_TWO_FILES = "Выберите два файла отчётов"
 
     # Уточняющая информация о файлах отчётов
@@ -60,7 +60,7 @@ class Constant:
     TEXT_ERROR_TYPE_TUNES_STR = "Попытка записать настройку с типом не str"
     TEXT_ERROR_WRITE = "Ошибка записи файла настроек"
     TEXT_ERROR_READ = (
-        f"Неверная информация в файле настроек.\n"
+        "Неверная информация в файле настроек.\n"
         "Программа работает с настройками по умолчанию"
     )
 
@@ -78,7 +78,7 @@ class Constant:
     CHECK_BOX_SUPER_FAST = "checkBoxSuperFast"
     CHECK_BOX_COMPS = "checkBoxComps"
     CHECK_BOX_LOADS = "checkBoxLoads"
-    WORKING_FOLDER = "working_folder"
+    SAVER_FOLDER = "saver_folder"
 
     # Типы контроля
     CHECK_BOX = "CheckBox"

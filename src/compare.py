@@ -117,7 +117,9 @@ def add_parsed_line_to_result(
         )
 
 
-def compare(records1: dict[str, VS], records2: dict[str, VS]) -> tuple[set, set, set]:
+def compare(
+    records1: dict[str, VS], records2: dict[str, VS]
+) -> tuple[set[str], set[str], set[str]]:
     """
     Сравнивает два набора записей и возвращает различия.
 
