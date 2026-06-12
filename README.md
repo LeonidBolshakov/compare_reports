@@ -84,6 +84,6 @@ python -m src.compare_reports
 
 ## Версия
 
-1.0
+1.5
 
 Июнь 2026 года
