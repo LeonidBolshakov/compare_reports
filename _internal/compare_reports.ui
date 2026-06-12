@@ -698,7 +698,7 @@
   <customwidget>
    <class>CustomTextBrowser</class>
    <extends>QTextBrowser</extends>
-   <header>customtextbrowser</header>
+   <header>src.customtextbrowser</header>
   </customwidget>
  </customwidgets>
  <tabstops>
