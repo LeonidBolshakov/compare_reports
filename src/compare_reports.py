@@ -29,10 +29,7 @@ from src.compare import parse_file, compare, VS
 from src.constants import Constant as c
 import src.functions as f
 from src.tunes import Tunes, DESCRIPTION_TUNES
-import src.customtextbrowser as customtextbrowser
 from src.customtextbrowser import CustomTextBrowser
-
-# sys.modules.setdefault("customtextbrowser", customtextbrowser)
 
 
 class DialogueState(Enum):
